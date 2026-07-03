@@ -968,7 +968,6 @@ function tryRestoreDraft() {
 }
 
 setInterval(() => { if (items.length) saveDraft(); }, 10000);
-tryRestoreDraft();
 
 
 
@@ -2706,6 +2705,11 @@ document.getElementById('delBatchDelete').addEventListener('click', () => {
 });
 
 console.log('ADMIN FULLY BUILT - all steps integrated successfully');
+
+// 一定要放在腳本最後面才呼叫：草稿還原用到的 categories/memoCatSelected/items 等變數
+// 跟 renderCatGrid()/renderItems() 都要先宣告/定義完成，太早呼叫會直接把後面所有程式碼卡死
+// （這正是上次「檔案上傳失效」的同一種 bug，這次已經移到安全的位置）
+tryRestoreDraft();
 </script>
 <!-- 分頁架構：新增知識卡／類別管理／知識卡管理，三個 tabPanel 用 switchTab() 切換 -->
 <!-- Memo 生效日期批次套用彈窗：改 Memo 起始/截止日時，可以勾選要一起套用新值的知識卡 -->
