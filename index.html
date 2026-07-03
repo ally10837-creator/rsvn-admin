@@ -416,7 +416,7 @@
       </div>
       <div class="ai-bar-txt"><strong>Gemini 正在分析...</strong>拆解知識點中，請稍候</div>
     </div>
-    <button class="btn btn-navy btn-full" id="btnAnalyze" onclick="analyze()">
+    <button class="btn btn-navy btn-full" id="btnAnalyze" onclick="analyze()" style="margin-bottom:16px;">
       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       用 Gemini AI 分析並產生知識卡
       <div class="spin" id="analyzeSpin"></div>
@@ -1786,7 +1786,8 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     '每條需包含 title（10字內）、content（80-200字口語化）、keywords（5-8個逗號分隔關鍵字）。',
     '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
     '另外請幫每條知識判斷 date（起始日，這條知識何時開始適用，YYYY-MM-DD 格式；如果內容沒有明確日期，就填今天 ' + todayStr + '）',
-    '和 expiry（截止日，這條知識何時失效，YYYY-MM-DD 格式；如果內容是長期適用、沒有明確截止日期，這個欄位請留空字串，不要亂猜一個日期）。'
+    '和 expiry（截止日，這條知識何時失效，YYYY-MM-DD 格式；如果內容是長期適用、沒有明確截止日期，這個欄位請留空字串，不要亂猜一個日期）。',
+    '不管這份 Memo 的名稱是你自己建議的、還是使用者已經填的，每一條 items 的 keywords 都要包含這個 Memo 名稱本身（或其核心關鍵字）。標題不用強求跟名稱一樣的字眼，各自用最貼切的說法即可，但關鍵字要能錨定回這個名稱，確保同事不管記得的是哪個說法，都能搜尋到這一整批知識。'
   ];
   if (docxTexts.length) { promptLines.push('Word 檔案內容：'); promptLines.push(docxTexts.join('\n\n')); }
   if (text) { promptLines.push('文字補充：'); promptLines.push(text); }
