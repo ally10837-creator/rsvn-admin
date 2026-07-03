@@ -1598,6 +1598,11 @@ function renderItems() {
             <span>類別（可複選）*</span>
           </label>
           <div class="cat-grid" data-item-idx="${i}" style="padding:4px 0"></div>
+          ${item.suggestedNewCategory ? `
+          <div style="margin-top:6px;font-size:11px;color:var(--gold);background:var(--cream);border:1px solid var(--border);border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:6px;">
+            💡 AI 覺得現有類別都不夠貼切，建議新增：<strong>${esc(item.suggestedNewCategory)}</strong>
+            <button type="button" onclick="switchTab('cat')" style="margin-left:auto;background:none;border:1px solid var(--gold);color:var(--gold);border-radius:6px;padding:2px 8px;font-size:10.5px;cursor:pointer;font-family:inherit;">去新增</button>
+          </div>` : ''}
         </div>
         <div class="fg" style="margin:0">
           <label>參考照片（選填）</label>
@@ -1883,7 +1888,8 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
   const promptLines = [
     '你是飯店訂房組知識庫管理 AI。',
     memoContextLine,
-    '請將內容拆解成 3-6 條員工可獨立查詢的知識條目。',
+    '請把內容拆解成員工可以獨立查詢的知識條目，數量依內容豐富度自行判斷，不要被固定條數限制住：內容單純的 memo 可能 2-3 條就夠，但像對照表、交叉比較表這種資訊密集的來源，拆到 10-20 條以上都合理。',
+    '每一條的判斷原則是「能不能被獨立搜尋、獨立查閱」——不同會員等級、不同權益類型、不同規則就該分開成不同條，不要為了湊進少量條目把不相關的規則硬塞在同一條裡，那樣之後搜尋會不準。',
     '每條需包含 title（10字內）、content（80-200字口語化）、keywords（5-8個逗號分隔關鍵字）。',
     '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
     '另外請幫每條知識判斷 date（起始日，這條知識何時開始適用，YYYY-MM-DD 格式；如果內容沒有明確日期，就填今天 ' + todayStr + '）',
@@ -1894,11 +1900,12 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     categories.map(c => '- ' + c).join('\n'),
     '',
     '請幫每一條知識判斷 categories（陣列，1-3 個，必須是上面清單裡「完整」的字串，例如 "房型/床型與可住人數"，不要只寫大類、也不要寫清單以外的名稱）。',
-    '同一份 Memo 底下不同條目可以有不同類別——不用全部套用同一組，依每條實際內容各自判斷最貼切的子類。判斷不出來、或內容真的橫跨太多子類時，這條可以先留空陣列，使用者送出前還是會逐條檢查。'
+    '同一份 Memo 底下不同條目可以有不同類別——不用全部套用同一組，依每條實際內容各自判斷最貼切的子類。判斷不出來、或內容真的橫跨太多子類時，這條可以先留空陣列，使用者送出前還是會逐條檢查。',
+    '如果某一條的內容在現有清單裡真的找不到夠貼切的子類（例如清單完全沒有涵蓋這個主題），額外給一個 suggestedNewCategory（字串，格式「大類/子類」，例如 "會員禮遇/兌點對照表"），當作建議新增的類別給使用者參考；這個欄位純粹是建議，不會自動新增類別，找得到貼切類別的條目就不用給這個欄位。'
   ];
   if (docxTexts.length) { promptLines.push('Word 檔案內容：'); promptLines.push(docxTexts.join('\n\n')); }
   if (text) { promptLines.push('文字補充：'); promptLines.push(text); }
-  promptLines.push('只回傳 JSON，格式為 {"memoTitle": "...", "items": [...]}，memoTitle 是你建議的 Memo 標題（如果上面已經有標題了，這裡就照抄原標題），items 陣列每個物件含 title、content、keywords、date、expiry、categories（陣列）。');
+  promptLines.push('只回傳 JSON，格式為 {"memoTitle": "...", "items": [...]}，memoTitle 是你建議的 Memo 標題（如果上面已經有標題了，這裡就照抄原標題），items 陣列每個物件含 title、content、keywords、date、expiry、categories（陣列）、suggestedNewCategory（選填字串）。');
   parts.push({ text: promptLines.join('\n') });
 
   try {
@@ -1930,7 +1937,8 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
         categories: aiCats.length ? aiCats : [...cats], keywords: it.keywords||'',
         imageFile: null, imageUrl: '', imageBase64: null, imageMediaType: '', imagePreviewUrl: '',
         date: it.date || defaultDate,     // AI 判斷的起始日，判斷不出來就用 Memo 的起始日
-        expiry: it.expiry || ''           // AI 判斷的截止日，判斷不出來就留空＝沒有期限，不硬猜
+        expiry: it.expiry || '',          // AI 判斷的截止日，判斷不出來就留空＝沒有期限，不硬猜
+        suggestedNewCategory: (typeof it.suggestedNewCategory === 'string' && it.suggestedNewCategory.trim()) ? it.suggestedNewCategory.trim() : ''
       };
     });
     // 如果目前的卡片裡有「使用者完全沒動過」的空白卡（預設那張、或按了+但沒填的），
@@ -2051,6 +2059,14 @@ function checkConflicts(rows) {
   function sharedProjectCat(catsA, catsB) {
     return catsA.find(c => catsB.includes(c)) || null;
   }
+  // 同專案底下截止日不一樣，不一定是忘記改——可能是像「販售期」跟「住宿適用期」
+  // 這種同專案但本來就該有不同效期的不同面向。用標題/關鍵字有沒有重疊當一個簡單的判斷依據：
+  // 有重疊代表兩張卡講的很可能是同一件事、效期卻不同，比較像是真的忘記同步改；
+  // 完全沾不上邊則比較像是同專案下本來就分屬不同面向，就不提醒，減少干擾
+  function sameTopic(titleA, kwA, titleB, kwB) {
+    if (titleA && titleB && titleA.length >= 2 && titleB.length >= 2 && (titleA.includes(titleB) || titleB.includes(titleA))) return true;
+    return kwA.some(k => kwB.includes(k));
+  }
 
   const exactWarnings = [];
   const similarWarnings = [];
@@ -2072,8 +2088,8 @@ function checkConflicts(rows) {
 
       const projA = projectCatsOf(rows[i].category), projB = projectCatsOf(rows[j].category);
       const shared = sharedProjectCat(projA, projB);
-      if (shared && (rows[i].expiry||'') !== (rows[j].expiry||'')) {
-        addWarning('expiry', `第 ${i+1} 條「${rows[i].title}」（截止日：${rows[i].expiry||'未設定'}）跟本次第 ${j+1} 條「${rows[j].title}」（截止日：${rows[j].expiry||'未設定'}）同屬「${shared}」但截止日不一致`);
+      if (shared && (rows[i].expiry||'') !== (rows[j].expiry||'') && sameTopic(tA, kws(rows[i].keywords), tB, kws(rows[j].keywords))) {
+        addWarning('expiry', `第 ${i+1} 條「${rows[i].title}」（截止日：${rows[i].expiry||'未設定'}）跟本次第 ${j+1} 條「${rows[j].title}」（截止日：${rows[j].expiry||'未設定'}）同屬「${shared}」、標題或關鍵字也有重疊，但截止日不一致`);
       }
     }
   }
@@ -2087,7 +2103,7 @@ function checkConflicts(rows) {
       parts.push('🔴 標題完全相同（很可能是重複資料）：\n' + exactWarnings.slice(0,5).join('\n') + (exactWarnings.length > 5 ? `\n...等共 ${exactWarnings.length} 筆` : ''));
     }
     if (expiryWarnings.length) {
-      parts.push('🟠 同專案截止日不一致（可能有一張忘記一起改）：\n' + expiryWarnings.slice(0,5).join('\n') + (expiryWarnings.length > 5 ? `\n...等共 ${expiryWarnings.length} 筆` : ''));
+      parts.push('🟠 同專案下標題/關鍵字相關的知識截止日不一致（可能有一張忘記一起改，但如果本來就是同專案不同面向、例如販售期跟住宿適用期天生不同，這是正常的，可以忽略）：\n' + expiryWarnings.slice(0,5).join('\n') + (expiryWarnings.length > 5 ? `\n...等共 ${expiryWarnings.length} 筆` : ''));
     }
     if (similarWarnings.length) {
       parts.push('🟡 內容疑似相關（建議留意，不一定是重複）：\n' + similarWarnings.slice(0,5).join('\n') + (similarWarnings.length > 5 ? `\n...等共 ${similarWarnings.length} 筆` : ''));
@@ -2113,8 +2129,8 @@ function checkConflicts(rows) {
 
           const eProj = projectCatsOf(e.category);
           const shared = sharedProjectCat(rProj, eProj);
-          if (shared && (r.expiry||'') !== (e.expiry||'')) {
-            addWarning('expiry', `第 ${idx+1} 條「${r.title}」（截止日：${r.expiry||'未設定'}）跟現有的「${e.title}」（截止日：${e.expiry||'未設定'}）同屬「${shared}」但截止日不一致`);
+          if (shared && (r.expiry||'') !== (e.expiry||'') && sameTopic(rTitle, rKws, eTitle, kws(e.keywords))) {
+            addWarning('expiry', `第 ${idx+1} 條「${r.title}」（截止日：${r.expiry||'未設定'}）跟現有的「${e.title}」（截止日：${e.expiry||'未設定'}）同屬「${shared}」、標題或關鍵字也有重疊，但截止日不一致`);
           }
         });
       });
