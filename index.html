@@ -682,12 +682,26 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbzRS0Dylt4EQLby7Z5CWvAE
 // ===================================================
 // GAS API 呼叫（透過 fetch POST，不用 google.script.run）
 // ===================================================
+// 帶逾時保護的 fetch：Gemini 或後端偶爾回應變慢時，不要讓使用者無限期乾等看著轉圈圈，
+// 逾時會丟出清楚的錯誤訊息，讓呼叫端的 .catch() 接住並告訴使用者發生什麼事
+function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, Object.assign({}, options, { signal: controller.signal }))
+    .finally(() => clearTimeout(timer))
+    .catch(err => {
+      if (err.name === 'AbortError') throw new Error('請求逾時（超過 ' + Math.round(timeoutMs/1000) + ' 秒沒有回應），請檢查網路後再試一次');
+      throw err;
+    });
+}
+
 function gasCall(action, payload) {
-  return fetch(GAS_URL, {
+  // 5 分鐘上限：送出大量知識卡＋檔案上傳可能比較久，留一點餘裕給 GAS 本身 6 分鐘的執行上限
+  return fetchWithTimeout(GAS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, ...payload })
-  }).then(r => r.json());
+  }, 300000).then(r => r.json());
 }
 
 
@@ -2104,9 +2118,10 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
   parts.push({ text: promptLines.join('\n') });
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts }] }) }
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts }] }) },
+      60000
     );
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
@@ -2226,7 +2241,7 @@ function submitAll() {
       if (spin) spin.classList.remove('show');
       return;
     }
-    doSubmit(rows, filesPayload, title, date, cats, btn, spin, staffName);
+    doSubmit(rows, filesPayload, title, date, expiry, cats, btn, spin, staffName);
   });
 }
 
@@ -2381,9 +2396,10 @@ async function checkSemanticConflicts(rows) {
     '只回傳 JSON，格式：{"matches":[{"newIndex":數字,"existingIndex":數字,"reason":"20字內說明為什麼意思相同"}]}，newIndex 對應「這次要新增」前面的編號，existingIndex 對應「既有知識」括號內的編號。完全沒有這種配對就回傳 {"matches":[]}，不要加任何其他文字或 Markdown。'
   ].join('\n\n');
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) },
+    60000
   );
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
@@ -2402,7 +2418,7 @@ async function checkSemanticConflicts(rows) {
     });
 }
 
-function doSubmit(rows, filesPayload, title, date, cats, btn, spin, staffName) {
+function doSubmit(rows, filesPayload, title, date, expiry, cats, btn, spin, staffName) {
 
   gasCall('saveKnowledge', { payload: { rows: rows, files: filesPayload, memoTitle: title, memoDate: date, memoExpiry: expiry, memoCats: cats, submittedBy: staffName } })
     .then(function(result) {
