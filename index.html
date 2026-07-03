@@ -391,14 +391,21 @@
       </div>
     </div>
 
-    <!-- File upload -->
+    <!-- File upload + AI analyze 放同一列：上傳框縮小，右側直接放分析按鈕，不用再滑到最下面 -->
     <div class="fg">
       <label>上傳 Memo 檔案（可多選）</label>
-      <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,image/*" multiple />
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <div class="upload-title">拖曳或點擊上傳</div>
-        <div class="upload-sub">PDF、Word (.docx)、JPG、PNG（單檔最大 20MB）</div>
+      <div style="display:flex;gap:10px;align-items:stretch;">
+        <div class="upload-zone" id="uploadZone" style="flex:1;">
+          <input type="file" id="fileInput" accept=".pdf,.docx,.doc,image/*" multiple />
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="upload-title">拖曳或點擊上傳</div>
+          <div class="upload-sub">PDF、Word (.docx)、JPG、PNG（單檔最大 20MB）</div>
+        </div>
+        <button class="btn btn-navy" id="btnAnalyze" onclick="analyze()" style="flex:0 0 116px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;white-space:normal;text-align:center;font-size:11.5px;line-height:1.35;padding:10px 8px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>用 Gemini AI 分析並產生知識卡</span>
+          <div class="spin" id="analyzeSpin"></div>
+        </button>
       </div>
       <div class="file-list" id="fileList"></div>
     </div>
@@ -409,18 +416,13 @@
       <textarea id="memoText" rows="5" placeholder="將 Memo 文字貼到這裡（與上傳檔案擇一或合併使用）..."></textarea>
     </div>
 
-    <!-- AI analyze -->
+    <!-- AI analyzing 狀態列（按鈕搬到上面了，這裡只保留分析中的提示） -->
     <div class="ai-bar" id="aiBar">
       <div class="ai-pulse">
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       </div>
       <div class="ai-bar-txt"><strong>Gemini 正在分析...</strong>拆解知識點中，請稍候</div>
     </div>
-    <button class="btn btn-navy btn-full" id="btnAnalyze" onclick="analyze()" style="margin-bottom:16px;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      用 Gemini AI 分析並產生知識卡
-      <div class="spin" id="analyzeSpin"></div>
-    </button>
 
   </div>
 </div>
@@ -2349,4 +2351,3 @@ console.log('ADMIN FULLY BUILT - all steps integrated successfully');
 <!-- 分頁架構：新增知識卡／類別管理／知識卡管理，三個 tabPanel 用 switchTab() 切換 -->
 </body>
 </html>
-
