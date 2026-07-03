@@ -859,6 +859,7 @@ function renderCatPicker(container, cats, opts) {
   let activeParent = groupOrder[0] || null;
   let searchTerm = '';
   let searchFocused = false;
+  let isComposing = false; // 注音/拼音輸入法組字狀態
 
   function countSelected(parent) {
     return (groups[parent] || []).filter(({full}) => selectedSet.has(full)).length;
@@ -945,7 +946,20 @@ function renderCatPicker(container, cats, opts) {
 
     searchEl.addEventListener('focus', () => { searchFocused = true; });
     searchEl.addEventListener('blur', () => { searchFocused = false; });
-    searchEl.addEventListener('input', () => { searchTerm = searchEl.value; render(); });
+    // 中文注音/拼音輸入法組字期間（例如打「厂」還沒選出「房」）不能重繪搜尋框，
+    // 重繪會把 input 這個 DOM 節點整個換掉，打斷輸入法的組字流程，
+    // 所以組字中只更新 searchTerm、不呼叫 render()，等 compositionend（選字完成）才真的重繪搜尋
+    searchEl.addEventListener('compositionstart', () => { isComposing = true; });
+    searchEl.addEventListener('compositionend', () => {
+      isComposing = false;
+      searchTerm = searchEl.value;
+      render();
+    });
+    searchEl.addEventListener('input', () => {
+      searchTerm = searchEl.value;
+      if (isComposing) return;
+      render();
+    });
 
     container.querySelectorAll('[data-remove-cat]').forEach(tag => {
       tag.addEventListener('click', () => {
