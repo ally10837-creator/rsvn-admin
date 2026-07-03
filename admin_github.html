@@ -1,0 +1,2085 @@
+<!-- VERSION-CHECK: admin-v3-clean-2026-07-01 -->
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>訂房組知識庫｜管理後台</title>
+  <!-- mammoth.js：在瀏覽器端把 .docx 轉成純文字，避免把整份檔案以 base64 送給 Gemini
+       （Gemini 免費層對「多模態/檔案輸入」的配額常是 0，純文字輸入才有免費額度） -->
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <!-- flatpickr removed - unreliable in GAS iframe sandbox, using native date inputs instead -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+    :root{
+      --navy:#0f2a45;--navy-md:#1a3d5c;--navy-lt:#234e72;
+      --gold:#c9a96e;--gold-lt:#e8c98a;
+      --cream:#f7f4ef;--slate:#64748b;
+      --border:#e2e8f0;--green:#22c55e;--red:#dc2626;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Noto Sans TC',sans-serif;background:var(--cream);color:#1e293b;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+    /* HEADER */
+    header{background:var(--navy);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 2px 12px rgba(0,0,0,.3);z-index:200;}
+    .brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;}
+    .brand-icon{width:32px;height:32px;background:var(--gold);border-radius:7px;display:flex;align-items:center;justify-content:center;}
+    .brand h1{font-size:15px;font-weight:700;letter-spacing:.04em;}
+    .brand span{font-size:11px;color:var(--gold-lt);font-weight:300;}
+    .nav-btn{color:rgba(255,255,255,.6);font-size:12px;text-decoration:none;padding:5px 12px;border-radius:7px;border:1px solid transparent;transition:all .15s;background:none;cursor:pointer;font-family:inherit;}
+    .nav-btn:hover{color:#fff;background:rgba(255,255,255,.08);}
+
+    /* API BAR */
+    .api-bar{background:var(--navy-md);border-bottom:1px solid var(--navy-lt);padding:8px 24px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+    .api-label{font-size:11px;color:var(--gold-lt);font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+    .api-wrap{position:relative;width:340px;}
+    .api-wrap input{width:100%;background:var(--navy);border:1px solid var(--navy-lt);border-radius:7px;color:#fff;font-size:12px;font-family:inherit;padding:6px 32px 6px 10px;outline:none;transition:border-color .2s;}
+    .api-wrap input:focus{border-color:var(--gold);}
+    .api-wrap input::placeholder{color:rgba(255,255,255,.3);}
+    .api-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgba(255,255,255,.35);display:flex;align-items:center;transition:color .15s;}
+    .api-eye:hover{color:var(--gold);}
+    .api-dot{width:7px;height:7px;border-radius:50%;background:#475569;flex-shrink:0;}
+    .api-dot.ok{background:var(--green);}
+    .api-status{font-size:11px;color:rgba(255,255,255,.4);display:flex;align-items:center;gap:5px;}
+    .api-note{font-size:10px;color:rgba(255,255,255,.25);margin-left:4px;}
+
+    /* TOP TABS */
+    .top-tabs{display:flex;gap:6px;padding:8px 24px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0;}
+    .top-tab{background:none;border:1px solid transparent;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--slate);cursor:pointer;font-family:inherit;transition:all .15s;}
+    .top-tab:hover{background:var(--cream);color:var(--navy);}
+    .top-tab.active{background:var(--navy);color:#fff;}
+
+    /* TAB PANELS：跟原本 body{display:flex;flex-direction:column} 版面相容——
+       tabPanelAdd 要撐起原本 .main + .submit-bar 的 flex 排版；
+       tabPanelCat / tabPanelDelete 內容用捲動即可，不用整頁固定高度 */
+    #tabPanelAdd{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+    #tabPanelCat, #tabPanelDelete{flex:1;overflow-y:auto;padding:20px 24px;}
+
+    /* MAIN 2-COL */
+    .main{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;}
+    .col{overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px;}
+    .col-left{background:#fff;border-right:1px solid var(--border);}
+    .col-right{background:var(--cream);}
+
+    /* SECTION TITLE */
+    .sec-title{font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:6px;padding-bottom:12px;border-bottom:2px solid var(--gold);margin-bottom:2px;}
+    .sec-title span{font-size:11px;font-weight:400;color:var(--slate);margin-left:auto;}
+
+    /* FORM */
+    .fg{display:flex;flex-direction:column;gap:4px;}
+    .fg label{font-size:10px;font-weight:600;color:var(--slate);letter-spacing:.05em;text-transform:uppercase;}
+    .fg input,.fg select,.fg textarea{font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:#1e293b;background:#fff;outline:none;transition:border-color .2s;width:100%;}
+    .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--gold);}
+    .fg textarea{resize:vertical;line-height:1.6;}
+    .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+    /* CATEGORY CHECKBOXES */
+    .cat-grid{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;}
+    .cat-chip{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;color:var(--slate);background:#fff;transition:all .15s;user-select:none;}
+
+    /* 分類樹狀元件 */
+    .cat-tree{border:1px solid var(--border);border-radius:8px;max-height:230px;overflow-y:auto;padding:6px;background:#fff;}
+    .cat-tree-group{margin-bottom:2px;}
+    .cat-tree-parent-row{display:flex;align-items:center;gap:4px;padding:5px 6px;border-radius:6px;transition:background .12s;}
+    .cat-tree-parent-row:hover{background:var(--cream);}
+    .cat-tree-toggle{width:14px;flex-shrink:0;text-align:center;color:var(--slate);cursor:pointer;transition:transform .15s;font-size:10px;}
+    .cat-tree-toggle.open{transform:rotate(90deg);}
+    .cat-tree-parent-label{font-weight:700;font-size:12px;color:var(--navy);cursor:pointer;flex:1;}
+    .cat-tree-selectall{font-size:10px;color:var(--gold);cursor:pointer;padding:2px 6px;border-radius:10px;transition:background .12s;white-space:nowrap;}
+    .cat-tree-selectall:hover{background:var(--cream);}
+    .cat-tree-children{margin-left:20px;display:none;border-left:1px solid var(--border);padding-left:8px;}
+    .cat-tree-children.open{display:block;}
+    .cat-tree-leaf-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--slate);transition:background .12s;}
+    .cat-tree-leaf-row:hover{background:var(--cream);}
+    .cat-tree-standalone-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--slate);transition:background .12s;}
+    .cat-tree-standalone-row:hover{background:var(--cream);}
+    .cat-tree input[type=checkbox]{accent-color:var(--gold);width:13px;height:13px;cursor:pointer;flex-shrink:0;}
+    /* 單選模式（重新命名/新增大類挑選用）：整列可點擊、選中反白，不用勾選框 */
+    .cat-tree.single .cat-tree-leaf-row,
+    .cat-tree.single .cat-tree-standalone-row,
+    .cat-tree.single .cat-tree-parent-label{cursor:pointer;}
+    .cat-tree.single .cat-tree-leaf-row.selected,
+    .cat-tree.single .cat-tree-standalone-row.selected,
+    .cat-tree.single .cat-tree-parent-row.selected{background:var(--navy);}
+    .cat-tree.single .cat-tree-leaf-row.selected,
+    .cat-tree.single .cat-tree-standalone-row.selected{color:#fff;}
+    .cat-tree.single .cat-tree-parent-row.selected .cat-tree-parent-label{color:#fff;}
+    .cat-tree-new-node{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--gold);font-weight:600;transition:background .12s;}
+    .cat-tree-new-node:hover{background:var(--cream);}
+    .cat-group-label{width:100%;font-size:9.5px;font-weight:700;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;margin:6px 0 -2px;}
+    .cat-group-label:first-child{margin-top:0;}
+    .edit-chip-like{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:11px;color:var(--slate);background:#fff;transition:all .15s;user-select:none;margin:2px;}
+    .edit-chip-like.checked{background:var(--navy);color:#fff;border-color:var(--navy);}
+    .edit-chip-like input{display:none;}
+    .cat-chip input{display:none;}
+    .cat-chip.checked{background:var(--navy);color:#fff;border-color:var(--navy);}
+    .cat-chip.checked .chip-dot{background:var(--gold);}
+    .chip-dot{width:6px;height:6px;border-radius:50%;background:#cbd5e1;flex-shrink:0;}
+
+    /* MODE TABS */
+    .mode-tabs{display:flex;gap:3px;background:var(--cream);padding:3px;border-radius:8px;}
+    .mode-tab{flex:1;padding:6px 8px;font-size:12px;font-family:inherit;border:none;border-radius:6px;cursor:pointer;font-weight:500;color:var(--slate);background:transparent;transition:all .15s;}
+    .mode-tab.active{background:#fff;color:var(--navy);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+
+    /* UPLOAD */
+    .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--cream);position:relative;}
+    .upload-zone:hover,.upload-zone.over{border-color:var(--gold);background:rgba(201,169,110,.05);}
+    .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;}
+    .upload-title{font-size:13px;font-weight:600;color:var(--navy);margin:7px 0 2px;}
+    .upload-sub{font-size:11px;color:var(--slate);}
+
+    /* FILE LIST */
+    .file-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+    .file-chip{display:flex;align-items:center;gap:8px;padding:7px 10px;background:#fff;border-radius:7px;border:1px solid var(--border);}
+    .file-chip-icon{color:var(--gold);flex-shrink:0;}
+    .file-chip-name{font-size:12px;font-weight:600;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .file-chip-size{font-size:10px;color:var(--slate);}
+    .file-chip-status{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;flex-shrink:0;}
+    .status-ready{background:#dbeafe;color:#1d4ed8;}
+    .status-uploading{background:#fef9c3;color:#854d0e;}
+    .status-done{background:#dcfce7;color:#15803d;}
+    .status-error{background:#fee2e2;color:#991b1b;}
+    .file-rm{background:none;border:none;cursor:pointer;color:#94a3b8;display:flex;align-items:center;flex-shrink:0;transition:color .15s;padding:2px;}
+    .file-rm:hover{color:var(--red);}
+
+    /* DIVIDER */
+    .divider{display:flex;align-items:center;gap:8px;}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+    .divider span{font-size:10px;color:#94a3b8;white-space:nowrap;}
+
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;transition:all .18s;}
+    .btn-navy{background:var(--navy);color:#fff;}.btn-navy:hover{background:var(--navy-lt);}
+    .btn-navy:disabled{opacity:.4;cursor:not-allowed;}
+    .btn-ghost{background:transparent;color:var(--slate);border:1px solid var(--border);}.btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
+    .btn-green{background:var(--green);color:#fff;}.btn-green:hover{background:#15803d;}
+    .btn-green:disabled{opacity:.4;cursor:not-allowed;}
+    .btn-full{width:100%;justify-content:center;}
+    .btn-red-ghost{background:none;border:none;cursor:pointer;color:#94a3b8;display:flex;align-items:center;border-radius:5px;padding:3px;transition:color .15s;}
+    .btn-red-ghost:hover{color:var(--red);}
+
+    /* AI BAR */
+    .ai-bar{display:none;align-items:center;gap:10px;padding:10px 12px;background:rgba(15,42,69,.05);border-radius:8px;border:1px solid var(--border);}
+    .ai-bar.show{display:flex;}
+    .ai-pulse{width:28px;height:28px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;animation:pulse 1.4s ease-in-out infinite;flex-shrink:0;}
+    @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+    .ai-bar-txt{font-size:12px;color:var(--slate);}
+    .ai-bar-txt strong{display:block;color:var(--navy);font-size:13px;}
+
+    /* KNOWLEDGE CARDS */
+    .k-empty{text-align:center;padding:32px 16px;color:#94a3b8;}
+    .k-empty svg{color:#d1d5db;margin-bottom:8px;}
+    .k-empty p{font-size:13px;margin-bottom:4px;}
+    .k-empty small{font-size:11px;}
+    .k-list{display:flex;flex-direction:column;gap:10px;}
+    .k-card{background:#fff;border:1px solid var(--border);border-radius:11px;overflow:hidden;transition:box-shadow .2s;}
+    .k-card:focus-within{box-shadow:0 0 0 3px rgba(201,169,110,.2);border-color:var(--gold);}
+    .k-head{display:flex;align-items:center;gap:7px;padding:9px 12px;background:var(--cream);border-bottom:1px solid var(--border);}
+    .k-num{width:20px;height:20px;background:var(--navy);color:#fff;border-radius:4px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .k-head input{flex:1;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--navy);padding:0;outline:none;}
+    .k-head input::placeholder{color:#94a3b8;font-weight:400;}
+    .k-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+    .k-body textarea{font-size:12px;min-height:64px;}
+    .k-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .k-row input,.k-row select{font-size:12px;}
+    .k-hint{font-size:10px;color:#94a3b8;margin-top:-4px;}
+
+    /* IMAGE ATTACH */
+    .img-attach{display:flex;align-items:center;gap:8px;}
+    .img-thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid var(--border);display:none;}
+    .img-thumb.show{display:block;}
+    .img-select{font-size:11px;color:var(--slate);background:var(--cream);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-family:inherit;transition:all .15s;}
+    .img-select:hover{border-color:var(--gold);color:var(--gold);}
+    .img-name{font-size:11px;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+    /* EXPIRY */
+    .expiry-row{display:flex;align-items:center;gap:8px;}
+    .expiry-toggle{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--slate);cursor:pointer;white-space:nowrap;}
+    .expiry-toggle input{accent-color:var(--gold);width:13px;height:13px;}
+    .expiry-date{font-size:12px;flex:1;}
+
+    /* ADD K BTN */
+    .btn-add-k{display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border:2px dashed var(--border);border-radius:11px;color:var(--slate);font-size:12px;font-weight:600;background:none;cursor:pointer;font-family:inherit;transition:all .15s;width:100%;}
+    .btn-add-k:hover{border-color:var(--gold);color:var(--gold);}
+
+    /* SUBMIT BAR */
+    .submit-bar{display:flex;align-items:center;gap:10px;padding:12px 24px;background:#fff;border-top:1px solid var(--border);flex-shrink:0;}
+    .submit-count{font-size:12px;color:var(--slate);}
+    .submit-count strong{color:var(--navy);}
+
+    /* SPINNER */
+    .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spinr .6s linear infinite;display:none;}
+    .spin.show{display:block;}
+    @keyframes spinr{to{transform:rotate(360deg);}}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(50px);background:var(--navy);color:#fff;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;display:flex;align-items:center;gap:7px;white-space:nowrap;}
+    .toast.show{transform:translateX(-50%) translateY(0);}
+    .toast.success{background:var(--green);}
+    .toast.error{background:var(--red);}
+
+    ::-webkit-scrollbar{width:4px;}
+    ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px;}
+  
+/* Date combo field - single text input + calendar icon trigger */
+.date-combo { position: relative; display: flex; align-items: center; }
+.date-combo input[type=text] {
+  width: 100%; padding-right: 36px;
+}
+.date-combo input[type=text].valid { border-color: #16a34a; }
+.date-combo input[type=text].invalid { border-color: #dc2626; }
+.date-pick-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: var(--slate); display: flex; align-items: center;
+  padding: 4px; border-radius: 5px; transition: all .15s;
+}
+.date-pick-btn:hover { background: var(--cream); color: var(--gold); }
+.date-native-hidden {
+  position: absolute; opacity: 0; pointer-events: none;
+  width: 1px; height: 1px; left: 0; bottom: 0;
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <a class="brand" href="https://script.google.com/macros/s/AKfycbzRS0Dylt4EQLby7Z5CWvAECpPZi3NTV44zZ8lC6mBOkJaCHOZ7Oo9z4B1q4FcVFuOfQw/exec" target="_blank">
+    <div class="brand-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0f2a45" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
+    <div><h1>訂房組知識庫</h1><span>管理後台</span></div>
+  </a>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <a class="nav-btn" href="#" id="indexLink"><- 返回知識庫</a>
+    <script>
+      // 戰情室（index.html）是掛在 GAS 底下，GitHub Pages 這邊沒辦法用
+      // google.script.run.getAppUrl()，所以直接沿用同一份 GAS_URL 組出正確網址
+      (function() {
+        var GAS_APP_URL = 'https://script.google.com/macros/s/AKfycbzRS0Dylt4EQLby7Z5CWvAECpPZi3NTV44zZ8lC6mBOkJaCHOZ7Oo9z4B1q4FcVFuOfQw/exec';
+        var idx = document.getElementById('indexLink');
+        if (idx) idx.href = GAS_APP_URL;
+      })();
+    </script>
+  </div>
+</header>
+
+<!-- API BAR -->
+<div class="api-bar">
+  <div class="api-label">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    Gemini API Key
+  </div>
+  <div class="api-wrap">
+    <input type="password" id="apiKeyInput" placeholder="貼上 Gemini API Key（AI 分析功能需要）" />
+    <button class="api-eye" id="apiEyeBtn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+  </div>
+  <div class="api-status"><div class="api-dot" id="apiDot"></div><span id="apiTxt">未設定</span></div>
+  <span class="api-note">Key 僅存於本機 sessionStorage，不會上傳</span>
+</div>
+
+<!-- TOP TABS -->
+<div class="top-tabs">
+  <button type="button" class="top-tab active" id="topTabAdd" onclick="switchTab('add')">＋ 新增知識卡</button>
+  <button type="button" class="top-tab" id="topTabCat" onclick="switchTab('cat')">🏷 類別管理</button>
+  <button type="button" class="top-tab" id="topTabDelete" onclick="switchTab('delete')">🗂 知識卡管理</button>
+</div>
+
+<!-- TAB PANEL：新增知識卡（原本的主畫面整個包進這個 div，用 switchTab() 控制顯示） -->
+<div id="tabPanelAdd">
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Knowledge cards (主體) -->
+  <div class="col col-left">
+
+    <div class="sec-title">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      新增知識卡
+      <span id="kCount">0 條</span>
+    </div>
+
+    <div class="k-empty" id="kEmpty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      <p>尚未有知識卡</p>
+      <small>點下方「新增一張知識卡」，或用右側 Memo/公告 AI 分析自動產生</small>
+    </div>
+
+    <div class="k-list" id="kList"></div>
+
+    <button class="btn-add-k" onclick="addItem()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      新增一張知識卡
+    </button>
+
+  </div>
+
+  <!-- RIGHT: Memo/公告（輔助工具，選填） -->
+  <div class="col col-right">
+
+    <div class="sec-title">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      用 Memo/公告快速產生知識卡（選填）
+    </div>
+
+    <div class="fg">
+      <label>標題（選填，AI 分析時會幫你預產，也可以自己填/改）</label>
+      <input type="text" id="memoTitle" placeholder="例：暑期特殊房價政策" />
+    </div>
+
+    <div class="fg">
+      <label>
+        類別（可複選，選填，套用到每條知識的預設值）
+      </label>
+      <div class="cat-grid" id="catGrid">
+        <div style="font-size:12px;color:#94a3b8;">載入中...</div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="fg">
+        <label>起始日</label>
+        <div class="date-combo">
+          <input type="text" id="memoDate" placeholder="YYYY-MM-DD 或輸入 8 碼數字" maxlength="10" inputmode="numeric" />
+          <button type="button" class="date-pick-btn" data-target="memoDate" title="開啟日期選擇器">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </button>
+          <input type="date" id="memoDate_native" class="date-native-hidden" tabindex="-1" />
+        </div>
+      </div>
+      <div class="fg">
+        <label>截止日</label>
+        <div class="date-combo">
+          <input type="text" id="memoExpiry" placeholder="YYYY-MM-DD 或輸入 8 碼數字" maxlength="10" inputmode="numeric" />
+          <button type="button" class="date-pick-btn" data-target="memoExpiry" title="開啟日期選擇器">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </button>
+          <input type="date" id="memoExpiry_native" class="date-native-hidden" tabindex="-1" />
+        </div>
+        <div class="k-hint">若這則知識沒有截止日，請留空</div>
+      </div>
+    </div>
+
+    <!-- File upload -->
+    <div class="fg">
+      <label>上傳 Memo 檔案（可多選）</label>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,image/*" multiple />
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div class="upload-title">拖曳或點擊上傳</div>
+        <div class="upload-sub">PDF、Word (.docx)、JPG、PNG（單檔最大 20MB）</div>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <!-- Text fallback -->
+    <div class="divider"><span>或直接貼上文字</span></div>
+    <div class="fg">
+      <textarea id="memoText" rows="5" placeholder="將 Memo 文字貼到這裡（與上傳檔案擇一或合併使用）..."></textarea>
+    </div>
+
+    <!-- AI analyze -->
+    <div class="ai-bar" id="aiBar">
+      <div class="ai-pulse">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div class="ai-bar-txt"><strong>Gemini 正在分析...</strong>拆解知識點中，請稍候</div>
+    </div>
+    <button class="btn btn-navy btn-full" id="btnAnalyze" onclick="analyze()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      用 Gemini AI 分析並產生知識卡
+      <div class="spin" id="analyzeSpin"></div>
+    </button>
+
+  </div>
+</div>
+
+<!-- SUBMIT BAR -->
+<div class="submit-bar">
+  <div class="submit-count">準備送出 <strong id="submitCount">0</strong> 張知識卡</div>
+  <div style="flex:1"></div>
+  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--slate);">
+    新增者姓名 <span style="color:#dc2626">*</span>
+    <input type="text" id="staffName" placeholder="請輸入你的姓名" style="width:110px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:inherit;" />
+  </label>
+  <button class="btn btn-ghost" onclick="resetAll()">清除全部</button>
+  <button class="btn btn-green" id="btnSubmit" onclick="submitAll()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    確認送出至知識庫
+    <div class="spin" id="submitSpin"></div>
+  </button>
+</div>
+
+<!-- /TAB PANEL：新增知識卡 -->
+
+<div class="toast" id="toast"></div>
+
+<!-- TAB PANEL：類別管理（原本是彈窗，改成分頁面板；內部邏輯/ID 都沒變） -->
+<div id="tabPanelCat" style="display:none;">
+  <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:22px;box-shadow:0 4px 20px rgba(0,0,0,.08);border:1px solid var(--border);">
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button type="button" id="catTabAdd" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--navy);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">新增</button>
+      <button type="button" id="catTabRename" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--slate);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">刪除及變更</button>
+    </div>
+
+    <!-- 新增模式：永遠先選/建大類，子類選填（留空就直接用大類本身當分類） -->
+    <div id="catAddPane">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">選擇大類</label>
+          <div id="catAddParentTree"></div>
+        </div>
+        <div id="catAddNewParentArea" style="display:none;">
+          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">新大類名稱</label>
+          <input type="text" id="catAddNewParentName" placeholder="例：交通" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">子類名稱（選填，留空就直接用大類本身當分類）</label>
+          <input type="text" id="catAddChildName" placeholder="例：接機（不填就只建立「交通」這個分類）" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;" />
+        </div>
+        <div style="font-size:11px;color:#94a3b8;background:var(--cream);padding:10px 12px;border-radius:8px;line-height:1.6;">
+          💡 命名建議：有明確時效性的活動（暑假快閃、生日專案）用「<b>專案/案名</b>」；長期適用的常態規則用「<b>功能領域/細項</b>」，例如 <b>交通/接機</b>、<b>會員禮遇/One&nbsp;Harmony</b>、<b>SOP/退款處理</b>。同一件事裡不同的具體細節（例如不同機場的車資、集合方式），建議拆成好幾張各自獨立的知識卡，細節寫在標題/關鍵字裡，不用往分類裡疊第三層。
+        </div>
+        <div id="catAddPreview" style="font-size:11px;color:#94a3b8;"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:20px;">
+        <div style="flex:1"></div>
+        <button id="catAddCancel" style="background:none;border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--slate);">取消</button>
+        <button id="catAddConfirm" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">新增</button>
+      </div>
+    </div>
+
+    <!-- 重新命名模式：三種明確的操作，不用使用者自己去推 -->
+    <div id="catRenamePane" style="display:none;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">要做什麼</label>
+          <select id="catRenameScope" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+            <option value="parent">改大類名字（底下所有相關的一起換）</option>
+            <option value="renameOnly">只改名字，位置不動</option>
+            <option value="move">搬到別的大類底下</option>
+          </select>
+          <div id="catRenameScopeHint" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;" id="catRenameOldLabel">選擇要改的分類</label>
+          <div id="catRenameOldTree"></div>
+          <div id="catDeleteArea" style="display:none;margin-top:8px;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button type="button" id="catMoveUpBtn" title="往上移" style="background:none;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↑</button>
+              <button type="button" id="catMoveDownBtn" title="往下移" style="background:none;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↓</button>
+              <span style="font-size:10px;color:#94a3b8;">調整「<span id="catMoveTarget"></span>」的顯示順序，知識庫也會同步</span>
+            </div>
+            <div>
+              <button type="button" id="catDeleteBtn" style="background:none;border:1px solid #fecaca;color:var(--red);font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit;">🗑 刪除「<span id="catDeleteTarget"></span>」</button>
+              <span style="font-size:10px;color:#94a3b8;margin-left:6px;">只能刪除沒有任何知識卡在用、也沒有子類的分類</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);padding-top:12px;">
+          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:8px;">改成什麼</label>
+          <div id="catRenameNewParentWrap">
+            <div id="catRenameLockedParent" style="display:none;padding:8px 10px;background:var(--cream);border-radius:8px;font-size:13px;color:var(--slate);margin-bottom:8px;"></div>
+            <div id="catRenameNewParentTree"></div>
+            <div id="catRenameNewParentTextArea">
+              <input type="text" id="catRenameNewParentText" placeholder="輸入新名字" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;margin-top:8px;" />
+            </div>
+          </div>
+          <div id="catRenameNewChildArea" style="margin-top:8px;">
+            <label style="font-size:11px;color:var(--slate);display:block;margin-bottom:4px;" id="catRenameNewChildLabel">名字</label>
+            <input type="text" id="catRenameNewChildText" placeholder="例：接機" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;" />
+          </div>
+        </div>
+
+        <div id="catRenamePreview" style="font-size:11px;color:#94a3b8;"></div>
+        <div style="font-size:11px;color:#94a3b8;">會同步更新 Categories 清單，以及所有已經貼上這個分類的知識卡，不會有殘留舊名稱的資料；如果新名稱剛好已經存在，會直接合併成一個。</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:20px;">
+        <div style="flex:1"></div>
+        <button id="catRenameCancel" style="background:none;border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--slate);">取消</button>
+        <button id="catRenameConfirm" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">重新命名</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- TAB PANEL：知識卡管理（多條件篩選 + 勾選批次刪除 / 匯出） -->
+<div id="tabPanelDelete" style="display:none;">
+  <div style="max-width:980px;margin:0 auto;">
+
+    <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+      🗂 知識卡管理
+      <span style="font-size:11px;font-weight:400;color:#94a3b8;">篩選後可以批次刪除或匯出，操作前建議先匯出備份</span>
+    </div>
+
+    <!-- 篩選條件 -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;">
+      <div style="min-width:160px;">
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">類別</label>
+        <select id="delFilterCat" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;">
+          <option value="">全部類別</option>
+        </select>
+      </div>
+      <div style="min-width:120px;">
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">新增者</label>
+        <input type="text" id="delFilterStaff" placeholder="姓名（模糊搜尋）" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">起始日範圍</label>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="date" id="delFilterDateFrom" style="padding:7px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;" />
+          <span style="color:#94a3b8;font-size:12px;">—</span>
+          <input type="date" id="delFilterDateTo" style="padding:7px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;" />
+        </div>
+      </div>
+      <div style="min-width:130px;">
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">效期狀態</label>
+        <select id="delFilterExpiry" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;">
+          <option value="all">全部</option>
+          <option value="active">未過期／永久</option>
+          <option value="expired">已過期</option>
+          <option value="none">未設定截止日</option>
+        </select>
+      </div>
+      <div style="flex:1"></div>
+      <button type="button" class="btn btn-navy" id="delFilterApply" style="padding:9px 18px;font-size:12.5px;">查詢</button>
+      <button type="button" id="delFilterReset" style="background:none;border:1px solid var(--border);border-radius:8px;padding:9px 14px;font-size:12px;color:var(--slate);cursor:pointer;font-family:inherit;">清除條件</button>
+    </div>
+
+    <div style="font-size:12px;color:var(--slate);margin-bottom:8px;" id="delResultCount">尚未查詢</div>
+
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+        <thead>
+          <tr style="background:var(--cream);">
+            <th style="padding:9px 10px;text-align:left;width:34px;"><input type="checkbox" id="delSelectAll" /></th>
+            <th style="padding:9px 10px;text-align:left;">標題</th>
+            <th style="padding:9px 10px;text-align:left;">類別</th>
+            <th style="padding:9px 10px;text-align:left;">新增者</th>
+            <th style="padding:9px 10px;text-align:left;">起始日</th>
+            <th style="padding:9px 10px;text-align:left;">截止日</th>
+            <th style="padding:9px 10px;text-align:left;">狀態</th>
+          </tr>
+        </thead>
+        <tbody id="delResultBody"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- 批次操作列 -->
+  <div id="delBatchBar" style="display:none;position:sticky;bottom:0;background:var(--navy);color:#fff;padding:10px 20px;border-radius:10px;align-items:center;gap:14px;margin:14px auto 0;max-width:980px;box-shadow:0 -4px 16px rgba(0,0,0,.15);">
+    <span style="font-size:13px;font-weight:600;">已選取 <strong id="delBatchCount">0</strong> 張知識卡</span>
+    <div style="flex:1"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+      刪除者姓名
+      <input type="text" id="delStaffName" placeholder="請輸入你的姓名" style="width:100px;padding:6px 8px;border:none;border-radius:6px;font-size:12px;font-family:inherit;" />
+    </label>
+    <button type="button" id="delBatchExport" style="background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;font-family:inherit;">匯出 CSV</button>
+    <button type="button" id="delBatchDelete" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">刪除選取項目</button>
+  </div>
+</div>
+
+
+<script>
+// 姓名欄位：預先帶入上次用過的名字方便同一人連續操作，但每次都攤在畫面上可以隨時改，
+// 換人用同一台電腦時不會被悄悄記錯是誰新增的
+(function() {
+  const el = document.getElementById('staffName');
+  const saved = localStorage.getItem('kb_last_staff_name');
+  if (saved) el.value = saved;
+})();
+
+// ===================================================
+// CONFIG - GAS 後端網址
+// ===================================================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzRS0Dylt4EQLby7Z5CWvAECpPZi3NTV44zZ8lC6mBOkJaCHOZ7Oo9z4B1q4FcVFuOfQw/exec';
+
+// ===================================================
+// GAS API 呼叫（透過 fetch POST，不用 google.script.run）
+// ===================================================
+function gasCall(action, payload) {
+  return fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action, ...payload })
+  }).then(r => r.json());
+}
+
+
+console.log('STEP 2c: starting');
+
+// ===================================================
+// API KEY
+// ===================================================
+const apiKeyInput = document.getElementById('apiKeyInput');
+const apiDot = document.getElementById('apiDot');
+const apiTxt = document.getElementById('apiTxt');
+
+const savedKey = sessionStorage.getItem('gemini_api_key');
+if (savedKey) { apiKeyInput.value = savedKey; }
+
+function updateApiStatus() {
+  const k = apiKeyInput.value.trim();
+  const ok = k.length > 20;
+  apiDot.className = 'api-dot' + (ok ? ' ok' : '');
+  apiTxt.textContent = ok ? 'API Key 已設定' : (k ? '格式不正確' : '未設定');
+}
+apiKeyInput.addEventListener('input', () => {
+  sessionStorage.setItem('gemini_api_key', apiKeyInput.value.trim());
+  updateApiStatus();
+});
+updateApiStatus();
+
+document.getElementById('apiEyeBtn').addEventListener('click', () => {
+  const inp = apiKeyInput;
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+});
+
+// ===================================================
+// UNIFIED DATE FIELD — 單一文字框，支援：
+//   1. 直接打 8 碼數字（20260701）自動格式化成 2026-07-01
+//   2. 直接打已含 - 的格式（2026-07-01）
+//   3. 點旁邊小日曆圖示，跳出原生日期選擇器，選完自動寫回文字框
+// ===================================================
+function setupDateCombo(fieldId) {
+  const textEl = document.getElementById(fieldId);
+  const nativeEl = document.getElementById(fieldId + '_native');
+  const btnEl = document.querySelector(`.date-pick-btn[data-target="${fieldId}"]`);
+  if (!textEl || !nativeEl || !btnEl) return;
+
+  function validateAndFormat(raw) {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 8) return { valid: false, formatted: raw };
+    const eightDigits = digits.slice(0, 8);
+    const y = eightDigits.slice(0, 4);
+    const m = eightDigits.slice(4, 6);
+    const d = eightDigits.slice(6, 8);
+    const candidate = `${y}-${m}-${d}`;
+    const testDate = new Date(candidate);
+    const valid = !isNaN(testDate.getTime())
+      && testDate.getFullYear() == Number(y)
+      && (testDate.getMonth() + 1) == Number(m)
+      && testDate.getDate() == Number(d);
+    return { valid, formatted: candidate };
+  }
+
+  textEl.addEventListener('input', (e) => {
+    let val = e.target.value;
+    // 只允許數字和減號，自動移除其他字元
+    val = val.replace(/[^\d-]/g, '');
+    e.target.value = val;
+    textEl.classList.remove('valid', 'invalid');
+
+    const digitsOnly = val.replace(/\D/g, '');
+    if (digitsOnly.length === 8) {
+      const result = validateAndFormat(val);
+      if (result.valid) {
+        textEl.value = result.formatted;
+        nativeEl.value = result.formatted;
+        textEl.classList.add('valid');
+      } else {
+        textEl.classList.add('invalid');
+      }
+    }
+  });
+
+  textEl.addEventListener('blur', () => {
+    const digitsOnly = textEl.value.replace(/\D/g, '');
+    if (digitsOnly.length > 0 && digitsOnly.length < 8) {
+      textEl.classList.add('invalid');
+    }
+  });
+
+  btnEl.addEventListener('click', () => {
+    if (nativeEl.showPicker) {
+      nativeEl.showPicker();
+    } else {
+      nativeEl.click();
+    }
+  });
+
+  nativeEl.addEventListener('change', () => {
+    if (nativeEl.value) {
+      textEl.value = nativeEl.value;
+      textEl.classList.remove('invalid');
+      textEl.classList.add('valid');
+    }
+  });
+}
+
+setupDateCombo('memoDate');
+setupDateCombo('memoExpiry');
+
+// 預設今天
+function getLocalDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+const todayStr = getLocalDateStr(new Date());
+document.getElementById('memoDate').value = todayStr;
+document.getElementById('memoDate_native').value = todayStr;
+document.getElementById('memoDate').classList.add('valid');
+
+
+
+// ===================================================
+// CATEGORIES — load from GAS backend with fallback
+// ===================================================
+let categories = [];
+
+function loadCategories() {
+  gasCall('getCategories').then(r => buildCatGrid(r.success ? r.data : null)).catch(() => buildCatGrid(null));
+}
+
+function buildCatGrid(cats) {
+  categories = (cats && cats.length) ? cats : ['SOP','會員禮遇','交通','設施','常見問題','特殊公告','其他'];
+  renderCatGrid();
+  // 類別是非同步從後端載入的，如果卡片比類別清單早渲染完成，
+  // 卡片上的類別選單會是空的（這就是螢幕上看到「類別空白」的原因）——這裡補刷新
+  if (items.length) renderItems();
+  else addItem();   // 頁面一開始就先給一張空白知識卡，不用先按「手動新增」
+}
+
+let memoCatSelected = new Set();   // Memo 層級目前勾選的類別（樹狀元件用）
+
+function renderCatGrid() {
+  const grid = document.getElementById('catGrid');
+  renderCatTree(grid, categories, {
+    mode: 'multi',
+    selected: memoCatSelected,
+    onChange: (cat, checked) => { if (checked) memoCatSelected.add(cat); else memoCatSelected.delete(cat); }
+  });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// #2：類別分層——用「大類/子類」斜線命名法（例如 "SOP/接機"），不用改資料結構，
+// 純粹是渲染時把同一個大類前綴的類別分組顯示，沒有斜線的維持原樣平鋪
+function groupCategories(cats) {
+  const groups = {};      // parent -> [{full, child}]
+  const groupOrder = [];  // 保持出現順序
+  const standalone = [];
+  cats.forEach(c => {
+    const slashIdx = c.indexOf('/');
+    if (slashIdx > 0 && slashIdx < c.length - 1) {
+      const parent = c.slice(0, slashIdx);
+      const child = c.slice(slashIdx + 1);
+      if (!groups[parent]) { groups[parent] = []; groupOrder.push(parent); }
+      groups[parent].push({ full: c, child });
+    } else {
+      standalone.push(c);
+    }
+  });
+  return { groups, groupOrder, standalone };
+}
+
+// ===================================================
+// 分類樹狀元件（多選勾選 or 單選點擊，兩種模式共用同一份繪製邏輯）
+// container: 要塞進去的 DOM 元素
+// cats: 完整類別字串陣列
+// opts.mode: 'multi'（勾選，複選）| 'single'（點擊，單選）
+// opts.selected: multi 模式給 Set，single 模式給字串
+// opts.onChange(cat, checked): multi 模式勾選變動時呼叫
+// opts.onSelect(cat): single 模式點擊選取時呼叫
+// opts.allowNewParent: single 模式底部要不要顯示「＋建立新大類」
+// opts.onNewParent(): 點了「＋建立新大類」要做什麼
+// ===================================================
+function renderCatTree(container, cats, opts) {
+  const isMulti = (opts.mode || 'multi') === 'multi';
+  const selectedSet = isMulti ? (opts.selected || new Set()) : null;
+  const selectedVal = !isMulti ? (opts.selected || '') : null;
+  const { groups, groupOrder, standalone } = groupCategories(cats);
+
+  function rowHTML(full, label, rowClass) {
+    if (isMulti) {
+      const checked = selectedSet.has(full) ? 'checked' : '';
+      return `<label class="${rowClass}" data-cat="${esc(full)}">
+        <input type="checkbox" ${checked} />
+        <span>${esc(label)}</span>
+      </label>`;
+    }
+    const sel = selectedVal === full ? 'selected' : '';
+    return `<div class="${rowClass} ${sel}" data-cat="${esc(full)}">${esc(label)}</div>`;
+  }
+
+  let html = `<div class="cat-tree ${isMulti ? '' : 'single'}">`;
+  standalone.forEach(c => { html += rowHTML(c, c, 'cat-tree-standalone-row'); });
+  groupOrder.forEach(parent => {
+    const parentSelected = !isMulti && selectedVal === parent ? 'selected' : '';
+    html += `<div class="cat-tree-group">
+      <div class="cat-tree-parent-row ${parentSelected}">
+        <span class="cat-tree-toggle open" data-toggle="${esc(parent)}">▶</span>
+        ${isMulti ? `<input type="checkbox" data-cat="${esc(parent)}" ${selectedSet.has(parent)?'checked':''} />` : ''}
+        <span class="cat-tree-parent-label" data-cat="${esc(parent)}">${esc(parent)}</span>
+        ${isMulti ? `<span class="cat-tree-selectall" data-selectall="${esc(parent)}">全選</span>` : ''}
+      </div>
+      <div class="cat-tree-children open">
+        ${groups[parent].map(({full, child}) => rowHTML(full, child, 'cat-tree-leaf-row')).join('')}
+      </div>
+    </div>`;
+  });
+  if (!isMulti && opts.allowNewParent) {
+    html += `<div class="cat-tree-new-node" data-new-parent="1">＋ 建立新大類</div>`;
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+
+  container.querySelectorAll('[data-toggle]').forEach(t => {
+    t.addEventListener('click', e => {
+      e.stopPropagation();
+      t.classList.toggle('open');
+      t.closest('.cat-tree-group').querySelector('.cat-tree-children').classList.toggle('open');
+    });
+  });
+
+  if (isMulti) {
+    container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const cat = cb.dataset.cat || cb.closest('[data-cat]').dataset.cat;
+        opts.onChange(cat, cb.checked);
+      });
+    });
+    container.querySelectorAll('[data-selectall]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const group = el.closest('.cat-tree-group');
+        const childCbs = group.querySelectorAll('.cat-tree-children input[type=checkbox]');
+        const allChecked = [...childCbs].every(cb => cb.checked);
+        childCbs.forEach(cb => { cb.checked = !allChecked; opts.onChange(cb.closest('[data-cat]').dataset.cat, !allChecked); });
+      });
+    });
+  } else {
+    const selector = opts.parentOnly ? '.cat-tree-parent-label, .cat-tree-standalone-row' : '[data-cat]';
+    container.querySelectorAll(selector).forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        opts.onSelect(el.dataset.cat);
+      });
+    });
+    if (opts.parentOnly) {
+      container.querySelectorAll('.cat-tree-leaf-row').forEach(el => { el.style.opacity = '.45'; el.style.cursor = 'default'; });
+    }
+    if (opts.allowNewParent) {
+      const nn = container.querySelector('[data-new-parent]');
+      if (nn) nn.addEventListener('click', e => { e.stopPropagation(); opts.onNewParent(); });
+    }
+  }
+}
+
+function renderChipGroup(cats, chipClass) {
+  const { groups, groupOrder, standalone } = groupCategories(cats);
+  let html = '';
+  if (standalone.length) {
+    html += standalone.map(c => `
+      <label class="${chipClass}">
+        <input type="checkbox" value="${esc(c)}" />
+        <div class="chip-dot"></div>
+        ${esc(c)}
+      </label>`).join('');
+  }
+  groupOrder.forEach(parent => {
+    html += `<div class="cat-group-label">${esc(parent)}</div>`;
+    html += groups[parent].map(({full, child}) => `
+      <label class="${chipClass}">
+        <input type="checkbox" value="${esc(full)}" />
+        <div class="chip-dot"></div>
+        ${esc(child)}
+      </label>`).join('');
+  });
+  return html;
+}
+
+function getSelectedCats() {
+  return [...memoCatSelected];
+}
+
+// ===================================================
+// 類別管理 / 知識卡管理分頁——共用同一組密碼閘
+// ===================================================
+// 「類別管理」「知識卡管理」共用這組密碼——只擋這兩個分頁，「新增知識卡」分頁不用密碼，同仁隨時能新增
+// ⚠️ 部署前記得改成實際要用的密碼；這是靜態頁面，密碼寫在原始碼裡，只能防止不小心誤按，不是真正的權限控管
+const CAT_MANAGE_PASSWORD = '5068';
+function checkCatManageAuth() {
+  if (sessionStorage.getItem('kb_catmanage_authed') === '1') return true;
+  for (let tries = 0; tries < 3; tries++) {
+    const pw = prompt('這個功能需要密碼：');
+    if (pw === null) return false;
+    if (pw === CAT_MANAGE_PASSWORD) { sessionStorage.setItem('kb_catmanage_authed', '1'); return true; }
+    if (tries < 2) alert('密碼錯誤，還可以再試 ' + (2 - tries) + ' 次');
+  }
+  alert('密碼錯誤次數過多');
+  return false;
+}
+
+// 三個頂層分頁的切換：新增知識卡（免密碼）／類別管理／知識卡管理（後兩者共用密碼閘）
+function switchTab(name) {
+  if ((name === 'cat' || name === 'delete') && !checkCatManageAuth()) return;
+
+  document.getElementById('tabPanelAdd').style.display    = name === 'add'    ? '' : 'none';
+  document.getElementById('tabPanelCat').style.display     = name === 'cat'    ? 'block' : 'none';
+  document.getElementById('tabPanelDelete').style.display  = name === 'delete' ? 'block' : 'none';
+  document.getElementById('topTabAdd').classList.toggle('active', name === 'add');
+  document.getElementById('topTabCat').classList.toggle('active', name === 'cat');
+  document.getElementById('topTabDelete').classList.toggle('active', name === 'delete');
+
+  if (name === 'cat') switchCatTab('add');
+  if (name === 'delete') initDeleteTab();
+}
+
+function switchCatTab(mode) {
+  const isAdd = mode === 'add';
+  document.getElementById('catAddPane').style.display = isAdd ? 'block' : 'none';
+  document.getElementById('catRenamePane').style.display = isAdd ? 'none' : 'block';
+  document.getElementById('catTabAdd').style.background = isAdd ? 'var(--navy)' : '#fff';
+  document.getElementById('catTabAdd').style.color = isAdd ? '#fff' : 'var(--slate)';
+  document.getElementById('catTabRename').style.background = isAdd ? '#fff' : 'var(--navy)';
+  document.getElementById('catTabRename').style.color = isAdd ? 'var(--slate)' : '#fff';
+  if (isAdd) populateParentSelect(); else populateRenameSelect();
+}
+document.getElementById('catTabAdd').addEventListener('click', () => switchCatTab('add'));
+document.getElementById('catTabRename').addEventListener('click', () => switchCatTab('rename'));
+// 「取消」按鈕原本是關閉彈窗，現在分頁沒有「關閉」的概念，改成切回新增知識卡分頁
+document.getElementById('catAddCancel').addEventListener('click', () => switchTab('add'));
+document.getElementById('catRenameCancel').addEventListener('click', () => switchTab('add'));
+
+// ---------- 新增類別：永遠先選/建大類，子類選填 ----------
+let catAddParentValue = '';   // '' | '__new__' | 現有大類名稱
+function populateParentSelect() {
+  const container = document.getElementById('catAddParentTree');
+  renderCatTree(container, categories, {
+    mode: 'single',
+    selected: catAddParentValue,
+    parentOnly: true,
+    allowNewParent: true,
+    onSelect: cat => {
+      catAddParentValue = cat;
+      document.getElementById('catAddNewParentArea').style.display = 'none';
+      populateParentSelect();
+    },
+    onNewParent: () => {
+      catAddParentValue = '__new__';
+      document.getElementById('catAddNewParentArea').style.display = 'block';
+      populateParentSelect();
+      document.getElementById('catAddNewParentName').focus();
+    }
+  });
+  updateCatAddPreview();
+}
+['catAddNewParentName','catAddChildName'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateCatAddPreview);
+});
+
+function currentCatAddValue() {
+  const parent = catAddParentValue === '__new__' ? document.getElementById('catAddNewParentName').value.trim() : catAddParentValue;
+  const child = document.getElementById('catAddChildName').value.trim();
+  if (!parent) return '';
+  return child ? (parent + '/' + child) : parent;
+}
+function updateCatAddPreview() {
+  const v = currentCatAddValue();
+  document.getElementById('catAddPreview').textContent = v ? ('將建立：' + v) : '';
+}
+
+document.getElementById('catAddConfirm').addEventListener('click', () => {
+  const trimmed = currentCatAddValue();
+  if (!trimmed) { alert('請至少選擇或建立一個大類'); return; }
+  if (categories.includes(trimmed)) { alert('這個類別已經存在'); return; }
+  categories.push(trimmed);
+  memoCatSelected.add(trimmed);   // 新增的類別自動勾選
+  renderCatGrid();
+  renderItems();
+  gasCall('addCategory', { name: trimmed }).catch(e => console.error('addCategory failed:', e));
+  // 停在同一個畫面，方便連續新增下一個分類，不用重新打開彈窗
+  catAddParentValue = '';
+  document.getElementById('catAddChildName').value = '';
+  document.getElementById('catAddNewParentName').value = '';
+  document.getElementById('catAddNewParentArea').style.display = 'none';
+  populateParentSelect();
+  document.getElementById('catAddPreview').innerHTML = '<span style="color:var(--green)">✓ 已新增「' + esc(trimmed) + '」，可以繼續新增下一個</span>';
+});
+
+// ---------- 重新命名/合併：三種操作各自的行為都不一樣 ----------
+function populateRenameSelect() {
+  catRenameOldValue = '';
+  catRenameNewParentValue = '';
+  document.getElementById('catDeleteArea').style.display = 'none';
+  populateRenameOldSelect();
+  populateRenameNewParentSelect();
+  updateScopeHint();
+  updateDestinationUI();
+}
+function updateScopeHint() {
+  const scope = document.getElementById('catRenameScope').value;
+  const hint = document.getElementById('catRenameScopeHint');
+  hint.textContent = {
+    parent: '例如把「交通」改名，「交通/接機」「交通/停車」會全部一起換成新名字',
+    renameOnly: '例如把「交通/接機」改成「交通/機場接送」，還是在「交通」底下，只是名字換了',
+    move: '例如把「交通/接機」搬到「會員禮遇」底下，變成「會員禮遇/接機」'
+  }[scope];
+}
+let catRenameOldValue = '';
+let catRenameNewParentValue = '';
+
+function populateRenameOldSelect() {
+  const scope = document.getElementById('catRenameScope').value;
+  const container = document.getElementById('catRenameOldTree');
+  const label = document.getElementById('catRenameOldLabel');
+  const hint = '（點大類可以整組改名，點子類可以單獨改名/搬移）';
+  if (scope === 'parent') {
+    label.textContent = '選擇要改名的大類' + hint;
+  } else {
+    label.textContent = (scope === 'move' ? '選擇要搬移的分類' : '選擇要改的分類') + hint;
+  }
+  renderCatTree(container, categories, {
+    mode: 'single', selected: catRenameOldValue, parentOnly: false,
+    onSelect: cat => {
+      catRenameOldValue = cat;
+      // 大類跟子類都能點：如果目前是「改大類名字」模式，但點到的其實是子類，
+      // 代表使用者要改的是單一子類，自動切到「只改名字，位置不動」比較合理
+      const { groupOrder } = groupCategories(categories);
+      if (document.getElementById('catRenameScope').value === 'parent' && !groupOrder.includes(cat)) {
+        document.getElementById('catRenameScope').value = 'renameOnly';
+        updateScopeHint();
+      }
+      populateRenameOldSelect();
+      updateDestinationUI();
+      document.getElementById('catDeleteArea').style.display = cat ? 'flex' : 'none';
+      document.getElementById('catDeleteTarget').textContent = cat;
+      document.getElementById('catMoveTarget').textContent = cat;
+    }
+  });
+}
+function populateRenameNewParentSelect() {
+  const container = document.getElementById('catRenameNewParentTree');
+  renderCatTree(container, categories, {
+    mode: 'single', selected: catRenameNewParentValue, parentOnly: true, allowNewParent: true,
+    onSelect: cat => {
+      catRenameNewParentValue = cat;
+      document.getElementById('catRenameNewParentTextArea').style.display = 'none';
+      populateRenameNewParentSelect();
+      updateCatRenamePreview();
+    },
+    onNewParent: () => {
+      catRenameNewParentValue = '__new__';
+      document.getElementById('catRenameNewParentTextArea').style.display = 'block';
+      populateRenameNewParentSelect();
+      document.getElementById('catRenameNewParentText').focus();
+      updateCatRenamePreview();
+    }
+  });
+}
+
+// 目的地欄位長怎樣，依「要做什麼」+ 目前選到的舊分類，動態切換
+function updateDestinationUI() {
+  const scope = document.getElementById('catRenameScope').value;
+  const oldVal = catRenameOldValue;
+  const lockedEl = document.getElementById('catRenameLockedParent');
+  const parentTreeEl = document.getElementById('catRenameNewParentTree');
+  const parentTextArea = document.getElementById('catRenameNewParentTextArea');
+  const childArea = document.getElementById('catRenameNewChildArea');
+  const childLabel = document.getElementById('catRenameNewChildLabel');
+
+  if (scope === 'parent') {
+    // 只需要填新大類名字，沒有子類欄位
+    lockedEl.style.display = 'none';
+    parentTreeEl.style.display = 'none';
+    parentTextArea.style.display = 'block';
+    document.getElementById('catRenameNewParentText').placeholder = '輸入新的大類名字';
+    childArea.style.display = 'none';
+  } else if (scope === 'renameOnly') {
+    const hasSlash = oldVal.indexOf('/') > 0;
+    parentTreeEl.style.display = 'none';
+    parentTextArea.style.display = 'none';
+    if (hasSlash) {
+      // 位置不動：大類鎖死顯示，只能改子類/細項名字
+      const parent = oldVal.slice(0, oldVal.indexOf('/'));
+      lockedEl.style.display = 'block';
+      lockedEl.textContent = '大類：' + parent + '（不會變動）';
+      childArea.style.display = 'block';
+      childLabel.textContent = '新名字';
+      document.getElementById('catRenameNewChildText').value = oldVal.slice(oldVal.indexOf('/') + 1);
+    } else {
+      // 本來就是平面分類：單純改名字，沒有大類/子類概念
+      lockedEl.style.display = 'none';
+      childArea.style.display = 'block';
+      childLabel.textContent = '新名字';
+      document.getElementById('catRenameNewChildText').value = oldVal;
+    }
+  } else { // move
+    lockedEl.style.display = 'none';
+    parentTreeEl.style.display = 'block';
+    populateRenameNewParentSelect();
+    parentTextArea.style.display = catRenameNewParentValue === '__new__' ? 'block' : 'none';
+    childArea.style.display = 'block';
+    childLabel.textContent = '搬過去之後的名字';
+    const hasSlash = oldVal.indexOf('/') > 0;
+    document.getElementById('catRenameNewChildText').value = hasSlash ? oldVal.slice(oldVal.indexOf('/') + 1) : oldVal;
+  }
+  updateCatRenamePreview();
+}
+
+document.getElementById('catRenameScope').addEventListener('change', () => {
+  catRenameOldValue = '';
+  catRenameNewParentValue = '';
+  document.getElementById('catDeleteArea').style.display = 'none';
+  populateRenameOldSelect();
+  updateScopeHint();
+  updateDestinationUI();
+});
+['catRenameNewParentText','catRenameNewChildText'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateCatRenamePreview);
+});
+
+function currentRenameNewValue() {
+  const scope = document.getElementById('catRenameScope').value;
+  const oldVal = catRenameOldValue;
+
+  if (scope === 'parent') {
+    return document.getElementById('catRenameNewParentText').value.trim();
+  }
+  if (scope === 'renameOnly') {
+    const newChild = document.getElementById('catRenameNewChildText').value.trim();
+    if (!newChild) return '';
+    const hasSlash = oldVal.indexOf('/') > 0;
+    if (!hasSlash) return newChild; // 平面分類，直接就是新名字
+    const parent = oldVal.slice(0, oldVal.indexOf('/'));
+    return parent + '/' + newChild;
+  }
+  // move
+  const parent = catRenameNewParentValue === '__new__' ? document.getElementById('catRenameNewParentText').value.trim() : catRenameNewParentValue;
+  const child = document.getElementById('catRenameNewChildText').value.trim();
+  if (!parent || !child) return '';
+  return parent + '/' + child;
+}
+function updateCatRenamePreview() {
+  const oldVal = catRenameOldValue;
+  const newVal = currentRenameNewValue();
+  const scope = document.getElementById('catRenameScope').value;
+  const el = document.getElementById('catRenamePreview');
+  if (!oldVal || !newVal) { el.textContent = ''; return; }
+  el.textContent = scope === 'parent'
+    ? `將把「${oldVal}」（含底下所有子類）改成「${newVal}」`
+    : `將把「${oldVal}」改成「${newVal}」`;
+}
+
+function moveCatOrder(direction) {
+  const name = catRenameOldValue;
+  if (!name) return;
+  gasCall('moveCategoryOrder', { name, direction }).then(result => {
+    if (result && result.error) { alert('無法調整：' + result.error); return; }
+    if (result && result.order) categories = result.order;
+    renderCatGrid();
+    renderItems();
+    populateRenameOldSelect();
+    document.getElementById('catDeleteArea').style.display = 'flex';
+    document.getElementById('catDeleteTarget').textContent = name;
+    document.getElementById('catMoveTarget').textContent = name;
+  }).catch(e => alert('無法調整：' + e.message));
+}
+document.getElementById('catMoveUpBtn').addEventListener('click', () => moveCatOrder('up'));
+document.getElementById('catMoveDownBtn').addEventListener('click', () => moveCatOrder('down'));
+
+document.getElementById('catDeleteBtn').addEventListener('click', () => {
+  const name = catRenameOldValue;
+  if (!name) return;
+  if (!confirm('確定要刪除「' + name + '」嗎？（只有完全沒被使用、也沒有子類的分類才刪得掉）')) return;
+  const btn = document.getElementById('catDeleteBtn');
+  btn.disabled = true;
+  gasCall('deleteCategory', { name }).then(result => {
+    btn.disabled = false;
+    if (result && result.error) { alert('無法刪除：' + result.error); return; }
+    categories = categories.filter(c => c !== name);
+    memoCatSelected.delete(name);
+    items.forEach(it => { it.categories = it.categories.filter(c => c !== name); });
+    catRenameOldValue = '';
+    document.getElementById('catDeleteArea').style.display = 'none';
+    renderCatGrid();
+    renderItems();
+    populateRenameOldSelect();
+    updateDestinationUI();
+    document.getElementById('catRenamePreview').innerHTML = '<span style="color:var(--green)">✓ 已刪除「' + esc(name) + '」</span>';
+  }).catch(e => {
+    btn.disabled = false;
+    alert('無法刪除：' + e.message);
+  });
+});
+
+document.getElementById('catRenameConfirm').addEventListener('click', () => {
+  const scope = document.getElementById('catRenameScope').value;
+  const oldName = catRenameOldValue;
+  const newName = currentRenameNewValue();
+  if (!oldName || !newName) { alert('請把欄位填完整'); return; }
+  if (oldName === newName) { alert('新舊名稱相同'); return; }
+  const isParent = scope === 'parent';
+  const btn = document.getElementById('catRenameConfirm');
+  btn.disabled = true; btn.textContent = '處理中...';
+  gasCall('renameCategory', { oldName, newName, isParent }).then(result => {
+    btn.disabled = false; btn.textContent = '重新命名';
+    if (result && result.error) { alert('失敗：' + result.error); return; }
+    function renameLocal(c) {
+      if (!isParent) return c === oldName ? newName : c;
+      if (c === oldName) return newName;
+      if (c.indexOf(oldName + '/') === 0) return newName + c.slice(oldName.length);
+      return c;
+    }
+    categories = [...new Set(categories.map(renameLocal))];
+    items.forEach(it => { it.categories = [...new Set(it.categories.map(renameLocal))]; });
+    renderCatGrid();
+    renderItems();
+    // 停在同一個畫面，方便連續改下一個分類，不用重新打開彈窗
+    catRenameOldValue = '';
+    catRenameNewParentValue = '';
+    document.getElementById('catDeleteArea').style.display = 'none';
+    document.getElementById('catRenameNewChildText').value = '';
+    document.getElementById('catRenameNewParentText').value = '';
+    populateRenameOldSelect();
+    updateDestinationUI();
+    document.getElementById('catRenamePreview').innerHTML = '<span style="color:var(--green)">✓ 已改成「' + esc(newName) + '」，同步更新了 ' + (result.updatedCards||0) + ' 張知識卡，可以繼續改下一個</span>';
+  }).catch(e => {
+    btn.disabled = false; btn.textContent = '重新命名';
+    alert('失敗：' + e.message);
+  });
+});
+
+loadCategories();
+
+
+
+// ===================================================
+// KNOWLEDGE ITEMS — 手動新增、編輯、刪除知識條目
+// ===================================================
+let items = [];   // [{title, content, categories[], keywords, imageFile, imageUrl, expiry}]
+
+function addItem() {
+  const cats = getSelectedCats();
+  const memoDateEl = document.getElementById('memoDate');
+  items.push({
+    title: '', content: '',
+    categories: cats.length ? [...cats] : [],
+    keywords: '', imageFile: null, imageUrl: '', expiry: '',
+    date: (memoDateEl && memoDateEl.value) || todayStr
+  });
+  renderItems();
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.k-card');
+    if (cards.length) cards[cards.length-1].scrollIntoView({ behavior:'smooth', block:'center' });
+  }, 60);
+}
+
+function removeItem(i) {
+  items.splice(i, 1);
+  renderItems();
+}
+
+function renderChipGroupChecked(cats, chipClass, checkedList) {
+  const { groups, groupOrder, standalone } = groupCategories(cats);
+  const chip = c => `
+      <label class="${chipClass}" data-cat="${esc(c)}">
+        <input type="checkbox" ${checkedList.includes(c)?'checked':''} />
+        ${esc(c.includes('/') ? c.slice(c.indexOf('/')+1) : c)}
+      </label>`;
+  let html = standalone.map(chip).join('');
+  groupOrder.forEach(parent => {
+    html += `<div class="cat-group-label">${esc(parent)}</div>`;
+    html += groups[parent].map(({full}) => chip(full)).join('');
+  });
+  return html;
+}
+
+function renderItems() {
+  const list  = document.getElementById('kList');
+  const empty = document.getElementById('kEmpty');
+  if (empty) empty.style.display = items.length ? 'none' : 'block';
+  const countEl = document.getElementById('kCount');
+  if (countEl) countEl.textContent = items.length + ' 條';
+  const submitCountEl = document.getElementById('submitCount');
+  if (submitCountEl) submitCountEl.textContent = items.length;
+
+  list.innerHTML = '';
+  items.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'k-card';
+
+    card.innerHTML = `
+      <div class="k-head">
+        <div class="k-num">${i+1}</div>
+        <input type="text" value="${esc(item.title)}" placeholder="知識點標題 *"
+          oninput="items[${i}].title=this.value" />
+        <button class="btn-red-ghost" onclick="removeItem(${i})">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        </button>
+      </div>
+      <div class="k-body">
+        <div class="fg" style="margin:0">
+          <label>詳細說明 *</label>
+          <textarea rows="3" placeholder="詳細說明..." oninput="items[${i}].content=this.value">${esc(item.content)}</textarea>
+        </div>
+        <div class="fg" style="margin:0">
+          <label style="display:flex;justify-content:space-between;align-items:center">
+            <span>類別（可複選）*</span>
+            <button type="button" class="btn-inline-add-cat" onclick="switchTab('cat')" style="background:none;border:none;color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;padding:0">+ 新增類別</button>
+          </label>
+          <div class="cat-grid" data-item-idx="${i}" style="padding:4px 0"></div>
+        </div>
+        <div class="k-row">
+          <div class="fg" style="margin:0">
+            <label>搜尋關鍵字</label>
+            <input type="text" value="${esc(item.keywords)}" placeholder="關鍵字1,關鍵字2..."
+              oninput="items[${i}].keywords=this.value" />
+            <div class="k-hint">逗號分隔，含口語說法</div>
+          </div>
+        </div>
+        <div class="k-row">
+          <div class="fg" style="margin:0">
+            <label>起始日 *</label>
+            <div class="date-combo">
+              <input type="text" id="itemDate_${i}" value="${esc(item.date||'')}" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" />
+              <button type="button" class="date-pick-btn" data-target="itemDate_${i}" title="開啟日期選擇器">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </button>
+              <input type="date" id="itemDate_${i}_native" class="date-native-hidden" tabindex="-1" />
+            </div>
+            <div class="k-hint">預設為 Memo 起始日，可個別調整</div>
+          </div>
+        </div>
+        <div class="k-row">
+          <div class="fg" style="margin:0">
+            <label>截止日（個別設定，留空則套用上方 Memo 的統一截止日）</label>
+            <div class="date-combo">
+              <input type="text" id="itemExpiry_${i}" value="${esc(item.expiry||'')}" placeholder="YYYY-MM-DD 或留空" maxlength="10" inputmode="numeric" />
+              <button type="button" class="date-pick-btn" data-target="itemExpiry_${i}" title="開啟日期選擇器">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </button>
+              <input type="date" id="itemExpiry_${i}_native" class="date-native-hidden" tabindex="-1" />
+            </div>
+            <div class="k-hint">若這則知識沒有截止日，請留空</div>
+          </div>
+        </div>
+      </div>`;
+    list.appendChild(card);
+
+    // 用樹狀元件渲染這張卡片的類別選擇（多選），選取狀態直接綁定回 items[i].categories
+    const catGridEl = card.querySelector('.cat-grid[data-item-idx]');
+    renderCatTree(catGridEl, categories, {
+      mode: 'multi',
+      selected: new Set(item.categories),
+      onChange: (cat, checked) => {
+        if (checked) { if (!items[i].categories.includes(cat)) items[i].categories.push(cat); }
+        else { items[i].categories = items[i].categories.filter(c => c !== cat); }
+      }
+    });
+
+    // bind per-item start date field (發布日期)
+    setupDateCombo('itemDate_' + i);
+    const dateEl = document.getElementById('itemDate_' + i);
+    const dateNativeEl = document.getElementById('itemDate_' + i + '_native');
+    if (dateEl) dateEl.addEventListener('input', () => { items[i].date = dateEl.value; });
+    if (dateNativeEl) dateNativeEl.addEventListener('change', () => { items[i].date = dateEl.value; });
+
+    // bind per-item expiry field. setupDateCombo() 先接手處理格式化跟日曆選擇器，
+    // 這裡的 listener 要「後」加，這樣讀到的才是格式化「之後」的值，不會跟 items[i].expiry 對不上
+    setupDateCombo('itemExpiry_' + i);
+    const expiryEl = document.getElementById('itemExpiry_' + i);
+    const expiryNativeEl = document.getElementById('itemExpiry_' + i + '_native');
+    if (expiryEl) expiryEl.addEventListener('input', () => { items[i].expiry = expiryEl.value; });
+    if (expiryNativeEl) expiryNativeEl.addEventListener('change', () => { items[i].expiry = expiryEl.value; });
+  });
+}
+
+
+
+// ===================================================
+// FILE UPLOAD
+// ===================================================
+let uploadedFiles = [];   // [{file, name, size, base64, mediaType, status, isDocx, extractedText}]
+
+const fileInput  = document.getElementById('fileInput');
+const uploadZone = document.getElementById('uploadZone');
+
+if (fileInput) fileInput.addEventListener('change', e => addFiles([...e.target.files]));
+if (uploadZone) {
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('over'));
+  uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('over'); addFiles([...e.dataTransfer.files]); });
+}
+
+function addFiles(files) {
+  files.forEach(file => {
+    if (file.size > 20 * 1024 * 1024) { alert(file.name + ' 超過 20MB 限制'); return; }
+    const ext = file.name.split('.').pop().toLowerCase();
+    const allowed = ['pdf','docx','doc','jpg','jpeg','png','gif','webp'];
+    if (!allowed.includes(ext)) { alert('不支援 .' + ext + ' 格式'); return; }
+
+    const isDocx = (ext === 'docx');
+    const entry = { file, name:file.name, size:file.size, base64:null, mediaType:getMediaType(file), status:'ready', isDocx, extractedText:null };
+    uploadedFiles.push(entry);
+    renderFileList();
+
+    // 標題還是空的時候，用檔名幫忙帶入預設值（去掉副檔名、開頭的「Memo-」、底線/連字號換成空格），
+    // 使用者還是可以自己改，不會被鎖住
+    const titleInput = document.getElementById('memoTitle');
+    if (titleInput && !titleInput.value.trim()) {
+      let guess = file.name.replace(/\.[^.]+$/, '');       // 去掉副檔名
+      guess = guess.replace(/^Memo[-_\s]*/i, '');           // 去掉開頭的 Memo- 前綴
+      guess = guess.replace(/[_-]+/g, ' ').trim();          // 底線/連字號換成空格
+      titleInput.value = guess;
+    }
+
+    // base64 一定要讀，因為送出時要把原始檔案上傳到 Drive（跟 Gemini 分析是兩件事）
+    const r = new FileReader();
+    r.onload = ev => { entry.base64 = ev.target.result.split(',')[1]; };
+    r.readAsDataURL(file);
+
+    // .docx 額外用 mammoth 在瀏覽器端抽出純文字，讓 AI 分析改吃文字、不吃檔案
+    if (isDocx && window.mammoth) {
+      file.arrayBuffer()
+        .then(buf => window.mammoth.extractRawText({ arrayBuffer: buf }))
+        .then(result => { entry.extractedText = (result.value || '').trim(); })
+        .catch(err => {
+          console.error('docx 文字抽取失敗：', err);
+          entry.extractedText = ''; // 抽取失敗就當作沒有文字，分析時會退回原本的檔案上傳方式
+        });
+    }
+  });
+  fileInput.value = '';
+}
+
+function getMediaType(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'docx' || ext === 'doc') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (['jpg','jpeg'].includes(ext)) return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  return file.type || 'application/octet-stream';
+}
+
+function removeFile(i) {
+  uploadedFiles.splice(i, 1);
+  renderFileList();
+}
+
+function renderFileList() {
+  const list = document.getElementById('fileList');
+  if (!list) return;
+  list.innerHTML = uploadedFiles.map((f, i) => `
+    <div class="file-chip">
+      <div class="file-chip-icon">${fileIcon(f.name)}</div>
+      <span class="file-chip-name">${esc(f.name)}</span>
+      <span class="file-chip-size">${(f.size/1024).toFixed(0)} KB</span>
+      <button class="file-rm" onclick="removeFile(${i})">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+function fileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (ext === 'pdf') return "<svg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z'/><polyline points='14 2 14 8 20 8'/></svg>";
+  return "<svg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><polyline points='21 15 16 10 5 21'/></svg>";
+}
+
+
+
+// ===================================================
+// GEMINI AI ANALYZE
+// ===================================================
+function analyze() {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey || apiKey.length < 20) { alert('\u8acb\u5148\u586b\u5165\u6709\u6548\u7684 Gemini API Key'); return; }
+
+  const title = document.getElementById('memoTitle').value.trim();
+  const cats  = getSelectedCats();
+  const text  = document.getElementById('memoText').value.trim();
+
+  // 標題不強制要求了——如果沒填，AI 分析時會順便幫你預產一個標題建議，
+  // 分析完之後這個欄位可以再手動編輯，不會被鎖死
+  if (!cats.length) { alert('\u8acb\u9078\u64c7\u81f3\u5c11\u4e00\u500b\u985e\u5225'); return; }
+  if (!text && uploadedFiles.every(f => !f.base64)) { alert('\u8acb\u4e0a\u50b3\u6a94\u6848\u6216\u8cbc\u4e0a\u6587\u5b57'); return; }
+
+  const pending = uploadedFiles.filter(f => (!f.base64 && f.file) || (f.isDocx && f.extractedText === null));
+  if (pending.length) { alert('\u6a94\u6848\u8b80\u53d6\u4e2d\uff0c\u8acb\u7a0d\u5019\u518d\u8a66'); return; }
+
+  const btn = document.getElementById('btnAnalyze');
+  if (btn) btn.disabled = true;
+  const spin = document.getElementById('analyzeSpin');
+  if (spin) spin.classList.add('show');
+  const aiBar = document.getElementById('aiBar');
+  if (aiBar) aiBar.classList.add('show');
+
+  const filesPayload = uploadedFiles
+    .filter(f => f.base64)
+    .map(f => ({ name: f.name, base64: f.base64, mediaType: f.mediaType, isDocx: f.isDocx, extractedText: f.extractedText }));
+
+  // \u6539\u7528 google.script.run \u8b93\u5f8c\u7aef\u4ee3\u70ba\u547c\u53eb Gemini API
+  // (\u524d\u7aef fetch() \u5728 GAS iframe \u6c99\u7bb1\u4e2d\u6703\u88ab\u5c01\u9396)
+  // 直接用 fetch() 呼叫 Gemini API（不經過 GAS 後端，免費 Key 可用）
+  analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spin, aiBar);
+}
+
+// 注意：btnAnalyze 已經有 HTML 的 onclick="analyze()"，這裡不需要再 addEventListener，
+// 不然會造成一次點擊觸發兩次分析（也會讓 API 額度被消耗成兩倍）
+
+
+
+
+
+
+
+// ===================================================
+// SUBMIT
+// ===================================================
+
+// ===================================================
+// DIRECT GEMINI CALL（前端直接打 API，不經過 GAS 後端）
+// ===================================================
+async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spin, aiBar) {
+  const parts = [];
+  const docxTexts = [];
+  filesPayload.forEach(f => {
+    if (f.isDocx) {
+      // .docx 已在瀏覽器端用 mammoth 抽成純文字，直接併入 prompt，
+      // 不走 inline_data —— 避開 Gemini 免費層對「檔案輸入」配額可能是 0 的問題
+      if (f.extractedText) docxTexts.push('【檔案：' + f.name + '】\n' + f.extractedText);
+      return;
+    }
+    if (!f.base64) return;
+    parts.push({ inline_data: { mime_type: f.mediaType, data: f.base64 } });
+  });
+
+  const memoContextLine = title
+    ? '以下是一份 Memo（標題：' + title + '，類別：' + cats.join('、') + '）。'
+    : '以下是一份 Memo（尚未命名，類別：' + cats.join('、') + '）。請幫這份 Memo 想一個 10 字內的精簡標題。';
+
+  const promptLines = [
+    '你是飯店訂房組知識庫管理 AI。',
+    memoContextLine,
+    '請將內容拆解成 3-6 條員工可獨立查詢的知識條目。',
+    '每條需包含 title（10字內）、content（80-200字口語化）、keywords（5-8個逗號分隔關鍵字）。',
+    '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
+    '另外請幫每條知識判斷 date（起始日，這條知識何時開始適用，YYYY-MM-DD 格式；如果內容沒有明確日期，就填今天 ' + todayStr + '）',
+    '和 expiry（截止日，這條知識何時失效，YYYY-MM-DD 格式；如果內容是長期適用、沒有明確截止日期，這個欄位請留空字串，不要亂猜一個日期）。'
+  ];
+  if (docxTexts.length) { promptLines.push('Word 檔案內容：'); promptLines.push(docxTexts.join('\n\n')); }
+  if (text) { promptLines.push('文字補充：'); promptLines.push(text); }
+  promptLines.push('只回傳 JSON，格式為 {"memoTitle": "...", "items": [...]}，memoTitle 是你建議的 Memo 標題（如果上面已經有標題了，這裡就照抄原標題），items 陣列每個物件含 title、content、keywords、date、expiry。');
+  parts.push({ text: promptLines.join('\n') });
+
+  try {
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts }] }) }
+    );
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const raw = (data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts[0].text)||'';
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+
+    // AI 建議的 Memo 標題：只有在使用者自己沒填的情況下才拿來用，不會覆蓋手動輸入的內容
+    const titleEl = document.getElementById('memoTitle');
+    if (titleEl && !titleEl.value.trim() && parsed.memoTitle) {
+      titleEl.value = parsed.memoTitle;
+    }
+
+    const memoDateEl2 = document.getElementById('memoDate');
+    const defaultDate = (memoDateEl2 && memoDateEl2.value) || todayStr;
+    const newItems = (parsed.items || []).map(it => ({
+      title: it.title||'', content: it.content||'',
+      categories: [...cats], keywords: it.keywords||'',
+      imageFile: null, imageUrl: '',
+      date: it.date || defaultDate,     // AI 判斷的起始日，判斷不出來就用 Memo 的起始日
+      expiry: it.expiry || ''           // AI 判斷的截止日，判斷不出來就留空＝沒有期限，不硬猜
+    }));
+    items = items.concat(newItems);
+    renderItems();
+    alert('Gemini \u7522\u751f\u4e86 ' + newItems.length + ' \u689d\u77e5\u8b58\u689d\u76ee');
+  } catch(err) {
+    alert('AI \u5206\u6790\u5931\u6557\uff1a' + (err.message||'\u8acb\u78ba\u8a8d API Key \u662f\u5426\u6709\u6548'));
+  } finally {
+    if (btn) btn.disabled = false;
+    if (spin) spin.classList.remove('show');
+    if (aiBar) aiBar.classList.remove('show');
+  }
+}
+
+function submitAll() {
+  const titleInput = document.getElementById('memoTitle').value.trim();
+  const cats  = getSelectedCats();
+  const date  = document.getElementById('memoDate').value || todayStr;   // 選填，沒填就用今天
+  const expiry = document.getElementById('memoExpiry').value;
+
+  if (!items.length){ alert('\u8acb\u81f3\u5c11\u65b0\u589e\u4e00\u689d\u77e5\u8b58\u689d\u76ee'); return; }
+
+  const invalid = items.findIndex(k => !k.title.trim() || !k.content.trim());
+  if (invalid >= 0) { alert('\u7b2c ' + (invalid+1) + ' \u689d\u7684\u6a19\u984c\u6216\u8aaa\u660e\u4e0d\u80fd\u7a7a\u767d'); return; }
+
+  // #14：知識條目類別改必填——Memo 層級類別只是預設值，
+  // 真正決定分類的是每條知識自己的類別，沒選會變成篩選不到的孤兒資料
+  const noCat = items.findIndex(k => !k.categories || !k.categories.length);
+  if (noCat >= 0) { alert('\u7b2c ' + (noCat+1) + ' \u689d\u8acb\u81f3\u5c11\u9078\u64c7\u4e00\u500b\u985e\u5225'); return; }
+
+  const noDate = items.findIndex(k => !k.date || !k.date.trim());
+  if (noDate >= 0) { alert('\u7b2c ' + (noDate+1) + ' \u689d\u8acb\u586b\u5beb\u8d77\u59cb\u65e5'); return; }
+
+  const staffName = document.getElementById('staffName').value.trim();
+  if (!staffName) { alert('請填寫新增者姓名'); document.getElementById('staffName').focus(); return; }
+  localStorage.setItem('kb_last_staff_name', staffName);   // 記住這次用的名字，方便下次連續操作，但每次都還是看得到、改得掉
+
+  // Memo 標題不是必填——AI 分析時已經會順便預產標題並填進欄位，
+  // 這裡純粹是最後防呆：如果使用者完全沒用 AI、也沒手動填，給一個日期命名的預設值
+  const title = titleInput || ('知識新增_' + date);
+
+  const btn = document.getElementById('btnSubmit');
+  if (btn) btn.disabled = true;
+  const spin = document.getElementById('submitSpin');
+  if (spin) spin.classList.add('show');
+
+  const filesPayload = uploadedFiles
+    .filter(f => f.base64)
+    .map(f => ({ name: f.name, base64: f.base64, mediaType: f.mediaType, isDocx: f.isDocx, extractedText: f.extractedText }));
+
+  const rows = items.map(k => ({
+    date: k.date || date,
+    category: k.categories.join(','),
+    title: k.title,
+    content: k.content,
+    image: k.imageUrl || '',
+    imageName: k.imageFile ? k.imageFile.name : '',
+    link: '',
+    keywords: k.keywords,
+    memo: title,
+    expiry: k.expiry || expiry || ''
+  }));
+
+  // #3：送出前先比對現有知識，標題完全相同或關鍵字高度重疊就提醒使用者確認
+  checkConflicts(rows).then(conflictMsg => {
+    if (conflictMsg && !confirm(conflictMsg + '\n\n仍要繼續送出嗎？')) {
+      if (btn) btn.disabled = false;
+      if (spin) spin.classList.remove('show');
+      return;
+    }
+    doSubmit(rows, filesPayload, title, date, cats, btn, spin, staffName);
+  });
+}
+
+// 回傳 null 代表沒有疑似重複；有的話回傳一段給使用者看的說明文字
+function checkConflicts(rows) {
+  const norm = s => (s||'').trim().toLowerCase().replace(/\s+/g,'');
+  const kws  = s => (s||'').split(',').map(k=>norm(k)).filter(Boolean);
+
+  // 判斷兩條知識像不像，回傳嚴重程度而不是單純 true/false：
+  // 'exact'  = 標題完全相同 → 很可能是真的重複，語氣強烈
+  // 'similar'= 標題互相包含 / 關鍵字重疊 2 個以上 → 只是提醒你留意，語氣較輕
+  // null     = 不像，或類別完全沒交集（不同專案巧合用到類似字眼，不當作重複）
+  function similarity(titleA, kwA, titleB, kwB, catA, catB) {
+    if (!titleA || !titleB) return null;
+    const sameCat = !catA.length || !catB.length || catA.some(c => catB.includes(c));
+    if (!sameCat) return null;
+    if (titleA === titleB) return 'exact';
+    if (titleA.length >= 3 && titleB.length >= 3 && (titleA.includes(titleB) || titleB.includes(titleA))) return 'similar';
+    const overlap = kwA.filter(k => kwB.includes(k)).length;
+    return overlap >= 2 ? 'similar' : null;
+  }
+
+  // 同專案（類別頂層是「專案/」開頭）底下的知識，截止日應該一致——
+  // 不一致代表可能有一張卡片忘記跟著改，是常見的維護疏漏
+  function projectCatsOf(catStr) {
+    return (catStr||'').split(',').map(c=>c.trim()).filter(c => c.startsWith('專案/'));
+  }
+  function sharedProjectCat(catsA, catsB) {
+    return catsA.find(c => catsB.includes(c)) || null;
+  }
+
+  const exactWarnings = [];
+  const similarWarnings = [];
+  const expiryWarnings = [];
+  function addWarning(level, msg) {
+    if (level === 'exact') exactWarnings.push(msg);
+    else if (level === 'similar') similarWarnings.push(msg);
+    else if (level === 'expiry') expiryWarnings.push(msg);
+  }
+
+  // 第一層：這次同一批要送出的知識，彼此之間有沒有重複（AI 一次分析容易切出主題重疊的多條）
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = i + 1; j < rows.length; j++) {
+      const tA = norm(rows[i].title), tB = norm(rows[j].title);
+      const catA = (rows[i].category||'').split(',').map(c=>c.trim()).filter(Boolean);
+      const catB = (rows[j].category||'').split(',').map(c=>c.trim()).filter(Boolean);
+      const level = similarity(tA, kws(rows[i].keywords), tB, kws(rows[j].keywords), catA, catB);
+      if (level) addWarning(level, `第 ${i+1} 條「${rows[i].title}」跟本次第 ${j+1} 條「${rows[j].title}」`);
+
+      const projA = projectCatsOf(rows[i].category), projB = projectCatsOf(rows[j].category);
+      const shared = sharedProjectCat(projA, projB);
+      if (shared && (rows[i].expiry||'') !== (rows[j].expiry||'')) {
+        addWarning('expiry', `第 ${i+1} 條「${rows[i].title}」（截止日：${rows[i].expiry||'未設定'}）跟本次第 ${j+1} 條「${rows[j].title}」（截止日：${rows[j].expiry||'未設定'}）同屬「${shared}」但截止日不一致`);
+      }
+    }
+  }
+
+  // 第二層：這次要送出的知識，有沒有跟資料庫裡已經存在的知識重複 / 效期不一致
+  function buildMessage(semanticWarnings) {
+    const semList = semanticWarnings || [];
+    if (!exactWarnings.length && !similarWarnings.length && !expiryWarnings.length && !semList.length) return null;
+    const parts = [];
+    if (exactWarnings.length) {
+      parts.push('🔴 標題完全相同（很可能是重複資料）：\n' + exactWarnings.slice(0,5).join('\n') + (exactWarnings.length > 5 ? `\n...等共 ${exactWarnings.length} 筆` : ''));
+    }
+    if (expiryWarnings.length) {
+      parts.push('🟠 同專案截止日不一致（可能有一張忘記一起改）：\n' + expiryWarnings.slice(0,5).join('\n') + (expiryWarnings.length > 5 ? `\n...等共 ${expiryWarnings.length} 筆` : ''));
+    }
+    if (similarWarnings.length) {
+      parts.push('🟡 內容疑似相關（建議留意，不一定是重複）：\n' + similarWarnings.slice(0,5).join('\n') + (similarWarnings.length > 5 ? `\n...等共 ${similarWarnings.length} 筆` : ''));
+    }
+    if (semList.length) {
+      parts.push('🔵 AI 判斷意思相近（換句話說的重複，字面比對抓不到）：\n' + semList.slice(0,5).join('\n') + (semList.length > 5 ? `\n...等共 ${semList.length} 筆` : ''));
+    }
+    return parts.join('\n\n');
+  }
+
+  return gasCall('getExistingTitlesAndKeywords').then(function(existing) {
+    if (existing && !existing.error && Array.isArray(existing)) {
+      rows.forEach((r, idx) => {
+        const rTitle = norm(r.title);
+        const rKws = kws(r.keywords);
+        const rCat = (r.category||'').split(',').map(c=>c.trim()).filter(Boolean);
+        const rProj = projectCatsOf(r.category);
+        existing.forEach(e => {
+          const eTitle = norm(e.title);
+          const eCat = (e.category||'').split(',').map(c=>c.trim()).filter(Boolean);
+          const level = similarity(rTitle, rKws, eTitle, kws(e.keywords), rCat, eCat);
+          if (level) addWarning(level, `第 ${idx+1} 條「${r.title}」跟現有的「${e.title}」`);
+
+          const eProj = projectCatsOf(e.category);
+          const shared = sharedProjectCat(rProj, eProj);
+          if (shared && (r.expiry||'') !== (e.expiry||'')) {
+            addWarning('expiry', `第 ${idx+1} 條「${r.title}」（截止日：${r.expiry||'未設定'}）跟現有的「${e.title}」（截止日：${e.expiry||'未設定'}）同屬「${shared}」但截止日不一致`);
+          }
+        });
+      });
+    }
+    // 第三層：AI 語意比對——前面兩層都是純文字比對（標題/關鍵字），
+    // 抓不到「同一件事、換句話說」的重複，交給 Gemini 看內容判斷
+    return checkSemanticConflicts(rows).catch(function(err) {
+      console.warn('AI 語意比對略過：', err && err.message);
+      return [];
+    }).then(function(semanticWarnings) {
+      return buildMessage(semanticWarnings);
+    });
+  }).catch(function() {
+    // 就算資料庫比對失敗，同一批內部的重複檢查結果還是要保留，不要整個吃掉
+    return buildMessage();
+  });
+}
+
+// 第三層 AI 語意比對的實作。回傳一個字串陣列（每筆是一段給使用者看的說明），
+// 沒設定 API Key、Gemini 呼叫失敗、或沒有可比對的候選時，一律回傳空陣列，
+// 讓字面比對（第一、二層）照常運作，不會因為這層失敗就整個擋住送出流程。
+async function checkSemanticConflicts(rows) {
+  const apiKey = (apiKeyInput && apiKeyInput.value.trim()) || sessionStorage.getItem('gemini_api_key') || '';
+  if (!apiKey || apiKey.length < 20) return [];
+
+  const allCats = Array.from(new Set(
+    rows.flatMap(r => (r.category||'').split(',').map(c=>c.trim()).filter(Boolean))
+  ));
+  if (!allCats.length) return [];
+
+  const existingFull = await gasCall('getExistingForSemanticCheck', { categories: allCats });
+  if (!existingFull || existingFull.error || !Array.isArray(existingFull) || !existingFull.length) return [];
+
+  // existingFull 後端已經排除過期知識了（過期規則沒有比對價值）；
+  // 這裡的 60 純粹是防 prompt 太長、浪費 Token——同類別未過期知識通常不會多到爆，
+  // 真的超過代表這個類別本身可能該拆分了
+  const candidates = existingFull.slice(0, 60);
+
+  const newList = rows.map((r,i) => `[${i+1}] 標題：${r.title}\n內容：${(r.content||'').slice(0,200)}`).join('\n\n');
+  const existList = candidates.map((c,i) => `(${i+1}) 標題：${c.title}\n內容：${(c.content||'').slice(0,200)}\n類別：${c.category}`).join('\n\n');
+
+  const prompt = [
+    '你是飯店訂房組知識庫的重複內容偵測助手。',
+    '以下是「這次要新增的知識」和「資料庫裡已經存在的知識」，請找出意思相同、但用詞或寫法不同的配對（同一件事換句話說的重複）。',
+    '只抓真的是同一件事的配對，不要抓只是同類別、但講不同事情的內容。',
+    '這次要新增的知識：',
+    newList,
+    '資料庫既有知識：',
+    existList,
+    '只回傳 JSON，格式：{"matches":[{"newIndex":數字,"existingIndex":數字,"reason":"20字內說明為什麼意思相同"}]}，newIndex 對應「這次要新增」前面的編號，existingIndex 對應「既有知識」括號內的編號。完全沒有這種配對就回傳 {"matches":[]}，不要加任何其他文字或 Markdown。'
+  ].join('\n\n');
+
+  const res = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+
+  const raw = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text) || '';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(clean);
+  const matches = Array.isArray(parsed.matches) ? parsed.matches : [];
+
+  return matches
+    .filter(m => m && m.newIndex >= 1 && m.newIndex <= rows.length && m.existingIndex >= 1 && m.existingIndex <= candidates.length)
+    .map(m => {
+      const r = rows[m.newIndex - 1];
+      const c = candidates[m.existingIndex - 1];
+      return `第 ${m.newIndex} 條「${r.title}」跟現有的「${c.title}」意思相近${m.reason ? '（' + m.reason + '）' : ''}`;
+    });
+}
+
+function doSubmit(rows, filesPayload, title, date, cats, btn, spin, staffName) {
+
+  gasCall('saveKnowledge', { payload: { rows: rows, files: filesPayload, memoTitle: title, memoDate: date, memoCats: cats, submittedBy: staffName } })
+    .then(function(result) {
+      if (spin) spin.classList.remove('show');
+      if (btn) btn.disabled = false;
+      if (result && result.error) {
+        alert('\u5beb\u5165\u5931\u6557\uff1a' + result.error);
+        return;
+      }
+      alert('已送出 ' + (result.count || rows.length) + ' 張知識卡');
+      setTimeout(resetAll, 300);
+    })
+    .catch(function(err) {
+      if (spin) spin.classList.remove('show');
+      if (btn) btn.disabled = false;
+      alert('\u5beb\u5165\u5931\u6557\uff1a' + err.message);
+    });
+}
+
+function resetAll() {
+  document.getElementById('memoTitle').value = '';
+  document.getElementById('memoDate').value  = todayStr;
+  document.getElementById('memoExpiry').value = '';
+  document.getElementById('memoText').value  = '';
+  memoCatSelected.clear();
+  renderCatGrid();
+  uploadedFiles = [];
+  renderFileList();
+  items = [];
+  renderItems();
+}
+
+// 注意：btnSubmit（onclick="submitAll()"）和 btnClearAll（onclick="resetAll()"）
+// 在 HTML 上都已經有 onclick，這裡不需要再 addEventListener，
+// 不然點一次會觸發兩次，導致送出的資料重複寫入 Sheet
+
+// ===================================================
+// 知識卡管理（多條件篩選 + 批次刪除 / 匯出）
+// ===================================================
+let delAllData = [];        // 這個分頁自己抓一份資料，跟「新增知識卡」分頁彼此獨立
+let delFilteredData = [];
+let delSelectedRowIds = new Set();
+let delTabLoaded = false;
+
+function initDeleteTab() {
+  const delStaffEl = document.getElementById('delStaffName');
+  const savedName = localStorage.getItem('kb_last_staff_name');
+  if (savedName && delStaffEl && !delStaffEl.value) delStaffEl.value = savedName;
+
+  if (delTabLoaded) return; // 只在第一次切進來時打後端，之後靠「查詢」按鈕手動刷新
+  delTabLoaded = true;
+  loadDeleteTabData();
+}
+
+function loadDeleteTabData() {
+  document.getElementById('delResultCount').textContent = '載入中...';
+  Promise.all([gasCall('getData'), gasCall('getCategories')]).then(([dataRes, catRes]) => {
+    delAllData = (dataRes && Array.isArray(dataRes.data)) ? dataRes.data : [];
+    const cats = (catRes && Array.isArray(catRes.data)) ? catRes.data : [];
+    populateDelCatFilter(cats);
+    applyDeleteFilters();
+  }).catch(err => {
+    document.getElementById('delResultCount').textContent = '讀取失敗：' + err.message;
+  });
+}
+
+function populateDelCatFilter(cats) {
+  const sel = document.getElementById('delFilterCat');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">全部類別</option>' + cats.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
+  sel.value = current || '';
+}
+
+function knowledgeExpiryStatus(k) {
+  if (!k.expiry) return 'none';
+  const exp = new Date(k.expiry); exp.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return exp < today ? 'expired' : 'active';
+}
+
+function applyDeleteFilters() {
+  const cat = document.getElementById('delFilterCat').value.trim();
+  const staff = document.getElementById('delFilterStaff').value.trim().toLowerCase();
+  const dFrom = document.getElementById('delFilterDateFrom').value;
+  const dTo = document.getElementById('delFilterDateTo').value;
+  const expiryFilter = document.getElementById('delFilterExpiry').value;
+
+  delFilteredData = delAllData.filter(k => {
+    if (cat) {
+      const cats = (k.category||'').split(',').map(c=>c.trim()).filter(Boolean);
+      if (!cats.includes(cat)) return false;
+    }
+    if (staff && !(k.submitted_by||'').toLowerCase().includes(staff)) return false;
+    if (dFrom && k.date && k.date < dFrom) return false;
+    if (dTo && k.date && k.date > dTo) return false;
+    if (expiryFilter !== 'all' && knowledgeExpiryStatus(k) !== expiryFilter) return false;
+    return true;
+  });
+
+  delSelectedRowIds.clear();
+  renderDeleteResults();
+}
+
+function renderDeleteResults() {
+  const body = document.getElementById('delResultBody');
+  document.getElementById('delResultCount').innerHTML = '共找到 <strong>' + delFilteredData.length + '</strong> 張知識卡';
+
+  if (!delFilteredData.length) {
+    body.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8;font-size:12px;">沒有符合條件的知識卡</td></tr>';
+    updateDeleteBatchBar();
+    syncDelSelectAllState();
+    return;
+  }
+
+  body.innerHTML = delFilteredData.map(k => {
+    const status = knowledgeExpiryStatus(k);
+    const statusLabel = status === 'expired' ? '<span style="color:var(--red);font-weight:600;">已過期</span>'
+      : status === 'none' ? '<span style="color:#94a3b8;">永久</span>'
+      : '<span style="color:var(--green);font-weight:600;">有效</span>';
+    const checked = delSelectedRowIds.has(k.rowId) ? 'checked' : '';
+    return '<tr style="border-top:1px solid var(--border);">' +
+      '<td style="padding:8px 10px;"><input type="checkbox" data-rowid="' + esc(k.rowId) + '" ' + checked + ' /></td>' +
+      '<td style="padding:8px 10px;">' + esc(k.title) + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(k.category) + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(k.submitted_by || '—') + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(k.date) + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(k.expiry || '—') + '</td>' +
+      '<td style="padding:8px 10px;">' + statusLabel + '</td>' +
+    '</tr>';
+  }).join('');
+
+  body.querySelectorAll('input[type=checkbox][data-rowid]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = cb.dataset.rowid;
+      if (cb.checked) delSelectedRowIds.add(id); else delSelectedRowIds.delete(id);
+      updateDeleteBatchBar();
+      syncDelSelectAllState();
+    });
+  });
+  syncDelSelectAllState();
+  updateDeleteBatchBar();
+}
+
+function syncDelSelectAllState() {
+  const all = document.getElementById('delSelectAll');
+  if (!delFilteredData.length) { all.checked = false; all.indeterminate = false; return; }
+  const selectedCount = delFilteredData.filter(k => delSelectedRowIds.has(k.rowId)).length;
+  all.checked = selectedCount === delFilteredData.length;
+  all.indeterminate = selectedCount > 0 && selectedCount < delFilteredData.length;
+}
+
+function updateDeleteBatchBar() {
+  const bar = document.getElementById('delBatchBar');
+  const n = delSelectedRowIds.size;
+  bar.style.display = n ? 'flex' : 'none';
+  document.getElementById('delBatchCount').textContent = n;
+}
+
+document.getElementById('delSelectAll').addEventListener('change', e => {
+  if (e.target.checked) delFilteredData.forEach(k => delSelectedRowIds.add(k.rowId));
+  else delSelectedRowIds.clear();
+  renderDeleteResults();
+});
+
+document.getElementById('delFilterApply').addEventListener('click', applyDeleteFilters);
+document.getElementById('delFilterReset').addEventListener('click', () => {
+  document.getElementById('delFilterCat').value = '';
+  document.getElementById('delFilterStaff').value = '';
+  document.getElementById('delFilterDateFrom').value = '';
+  document.getElementById('delFilterDateTo').value = '';
+  document.getElementById('delFilterExpiry').value = 'all';
+  applyDeleteFilters();
+});
+
+function selectedDeleteRows() {
+  return delFilteredData.filter(k => delSelectedRowIds.has(k.rowId));
+}
+
+// 匯出 CSV：前面加 BOM，避免 Excel 開啟中文變亂碼
+function exportKnowledgeToCsv(rows) {
+  const headers = ['標題','類別','內容','新增者','起始日','截止日','關鍵字'];
+  const lines = [headers.join(',')];
+  rows.forEach(k => {
+    const cells = [k.title, k.category, k.content, k.submitted_by, k.date, k.expiry, k.keywords]
+      .map(v => '"' + String(v||'').replace(/"/g,'""') + '"');
+    lines.push(cells.join(','));
+  });
+  const csv = '\uFEFF' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '知識卡匯出_' + todayStr + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('delBatchExport').addEventListener('click', () => {
+  const rows = selectedDeleteRows();
+  if (!rows.length) { alert('請先勾選要匯出的知識卡'); return; }
+  exportKnowledgeToCsv(rows);
+});
+
+document.getElementById('delBatchDelete').addEventListener('click', () => {
+  const rows = selectedDeleteRows();
+  if (!rows.length) { alert('請先勾選要刪除的知識卡'); return; }
+  const deleter = document.getElementById('delStaffName').value.trim();
+  if (!deleter) { alert('請先填寫刪除者姓名'); document.getElementById('delStaffName').focus(); return; }
+
+  const preview = rows.slice(0, 8).map(k => '・' + k.title).join('\n') + (rows.length > 8 ? '\n...等共 ' + rows.length + ' 張' : '');
+  const ok = confirm('確定要刪除以下 ' + rows.length + ' 張知識卡嗎？此動作無法復原：\n\n' + preview);
+  if (!ok) return;
+
+  const btn = document.getElementById('delBatchDelete');
+  btn.disabled = true;
+  btn.textContent = '刪除中...';
+
+  gasCall('deleteKnowledgeBatch', { rowIds: rows.map(k => k.rowId), deletedBy: deleter })
+    .then(res => {
+      btn.disabled = false;
+      btn.textContent = '刪除選取項目';
+      if (res && res.error) { alert('刪除失敗：' + res.error); return; }
+      localStorage.setItem('kb_last_staff_name', deleter);
+      const deletedIds = new Set(rows.map(k => k.rowId));
+      delAllData = delAllData.filter(k => !deletedIds.has(k.rowId));
+      delSelectedRowIds.clear();
+      applyDeleteFilters();
+      alert('已刪除 ' + rows.length + ' 張知識卡');
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.textContent = '刪除選取項目';
+      alert('刪除失敗：' + err.message);
+    });
+});
+
+console.log('ADMIN FULLY BUILT - all steps integrated successfully');
+</script>
+<!-- 分頁架構：新增知識卡／類別管理／知識卡管理，三個 tabPanel 用 switchTab() 切換 -->
+</body>
+</html>
