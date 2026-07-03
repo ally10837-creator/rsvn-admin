@@ -55,7 +55,14 @@
        tabPanelAdd 要撐起原本 .main + .submit-bar 的 flex 排版；
        tabPanelCat / tabPanelDelete 內容用捲動即可，不用整頁固定高度 */
     #tabPanelAdd{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
-    #tabPanelCat, #tabPanelDelete{flex:1;overflow-y:auto;padding:20px 24px;}
+    #tabPanelDelete{flex:1;overflow-y:auto;padding:20px 24px;}
+    /* 類別管理：比照新增知識卡頁的滿版兩欄排版，不再是彈窗殘留的窄卡片置中樣式 */
+    #tabPanelCat{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+    #tabPanelCat .cat-top-bar{padding:14px 24px 0;flex-shrink:0;}
+    #tabPanelCat .cat-cols{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;}
+    #tabPanelCat .cat-col{overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px;}
+    #tabPanelCat .cat-col-left{background:#fff;border-right:1px solid var(--border);}
+    #tabPanelCat .cat-col-right{background:var(--cream);}
 
     /* MAIN 2-COL */
     .main{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;}
@@ -458,95 +465,91 @@
 
 <!-- TAB PANEL：類別管理（原本是彈窗，改成分頁面板；內部邏輯/ID 都沒變） -->
 <div id="tabPanelCat" style="display:none;">
-  <div id="catReturnBanner" style="display:none;max-width:540px;width:100%;margin-bottom:10px;background:var(--navy);color:#fff;border-radius:10px;padding:10px 14px;font-size:12px;display:flex;align-items:center;gap:8px;justify-content:space-between;">
-    <span id="catReturnBannerText"></span>
-    <button type="button" onclick="returnToTriggerCard()" style="background:var(--gold);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">返回剛才的卡片</button>
-  </div>
-  <div style="background:#fff;border-radius:14px;max-width:540px;width:100%;padding:22px;box-shadow:0 4px 20px rgba(0,0,0,.08);border:1px solid var(--border);">
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button type="button" id="catTabAdd" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--navy);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">新增</button>
-      <button type="button" id="catTabRename" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--slate);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">刪除及變更</button>
+  <div class="cat-top-bar">
+    <div id="catReturnBanner" style="display:none;width:100%;margin-bottom:10px;background:var(--navy);color:#fff;border-radius:10px;padding:10px 14px;font-size:12px;align-items:center;gap:8px;justify-content:space-between;">
+      <span id="catReturnBannerText"></span>
+      <button type="button" onclick="returnToTriggerCard()" style="background:var(--gold);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">返回剛才的卡片</button>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button type="button" id="catTabAdd" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:var(--navy);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">新增</button>
+      <button type="button" id="catTabRename" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--slate);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">刪除及變更</button>
+    </div>
+  </div>
 
-    <!-- 新增模式：永遠先選/建大類，子類選填（留空就直接用大類本身當分類） -->
-    <div id="catAddPane">
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div>
-          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">選擇大類</label>
-          <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;height:190px;">
-            <div style="width:42%;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;" id="catAddParentTree"></div>
-            <div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px;">
-              <div id="catAddNewParentArea" style="display:none;">
-                <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">新大類名稱</label>
-                <input type="text" id="catAddNewParentName" placeholder="例：交通" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;" />
-              </div>
-              <div>
-                <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">子類名稱（選填，留空就直接用大類本身當分類）</label>
-                <input type="text" id="catAddChildName" placeholder="例：接機（不填就只建立「交通」這個分類）" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;" />
-              </div>
-              <div id="catAddPreview" style="font-size:11px;color:#94a3b8;"></div>
-            </div>
-          </div>
-        </div>
-        <div style="font-size:11px;color:#94a3b8;background:var(--cream);padding:10px 12px;border-radius:8px;line-height:1.6;">
-          💡 命名建議：有明確時效性的活動（暑假快閃、生日專案）用「<b>專案/案名</b>」；長期適用的常態規則用「<b>功能領域/細項</b>」，例如 <b>交通/接機</b>、<b>會員禮遇/One&nbsp;Harmony</b>、<b>SOP/退款處理</b>。同一件事裡不同的具體細節（例如不同機場的車資、集合方式），建議拆成好幾張各自獨立的知識卡，細節寫在標題/關鍵字裡，不用往分類裡疊第三層。
-        </div>
+  <!-- 新增模式：永遠先選/建大類，子類選填（留空就直接用大類本身當分類） -->
+  <div id="catAddPane" class="cat-cols">
+    <div class="cat-col cat-col-left">
+      <label style="font-size:11px;color:var(--slate);font-weight:600;">選擇大類</label>
+      <div id="catAddParentTree" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:#fff;"></div>
+    </div>
+    <div class="cat-col cat-col-right">
+      <div id="catAddNewParentArea" style="display:none;">
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">新大類名稱</label>
+        <input type="text" id="catAddNewParentName" placeholder="例：交通" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;" />
       </div>
-      <div style="display:flex;gap:8px;margin-top:20px;">
-        <div style="flex:1"></div>
+      <div>
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">子類名稱（選填，留空就直接用大類本身當分類）</label>
+        <input type="text" id="catAddChildName" placeholder="例：接機（不填就只建立「交通」這個分類）" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;" />
+      </div>
+      <div id="catAddPreview" style="font-size:11px;color:#94a3b8;"></div>
+      <div style="font-size:11px;color:#94a3b8;background:#fff;padding:10px 12px;border-radius:8px;line-height:1.6;border:1px solid var(--border);">
+        💡 命名建議：有明確時效性的活動（暑假快閃、生日專案）用「<b>專案/案名</b>」；長期適用的常態規則用「<b>功能領域/細項</b>」，例如 <b>交通/接機</b>、<b>會員禮遇/One&nbsp;Harmony</b>、<b>SOP/退款處理</b>。同一件事裡不同的具體細節（例如不同機場的車資、集合方式），建議拆成好幾張各自獨立的知識卡，細節寫在標題/關鍵字裡，不用往分類裡疊第三層。
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button id="catAddCancel" style="background:none;border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--slate);">取消</button>
         <button id="catAddConfirm" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">新增</button>
       </div>
     </div>
+  </div>
 
-    <!-- 重新命名模式：三種明確的操作，不用使用者自己去推 -->
-    <div id="catRenamePane" style="display:none;">
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div>
-          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">要做什麼</label>
-          <select id="catRenameScope" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
-            <option value="parent">改大類名字（底下所有相關的一起換）</option>
-            <option value="renameOnly">只改名字，位置不動</option>
-            <option value="move">搬到別的大類底下</option>
-          </select>
-          <div id="catRenameScopeHint" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
+  <!-- 重新命名模式：三種明確的操作，不用使用者自己去推 -->
+  <div id="catRenamePane" class="cat-cols" style="display:none;">
+    <div class="cat-col cat-col-left">
+      <label style="font-size:11px;color:var(--slate);font-weight:600;" id="catRenameOldLabel">選擇要改的分類</label>
+      <div id="catRenameOldTree" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:#fff;"></div>
+      <div id="catDeleteArea" style="display:none;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button type="button" id="catMoveUpBtn" title="往上移" style="background:#fff;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↑</button>
+          <button type="button" id="catMoveDownBtn" title="往下移" style="background:#fff;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↓</button>
+          <span style="font-size:10px;color:#94a3b8;">調整「<span id="catMoveTarget"></span>」的顯示順序，知識庫也會同步</span>
         </div>
         <div>
-          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;" id="catRenameOldLabel">選擇要改的分類</label>
-          <div id="catRenameOldTree"></div>
-          <div id="catDeleteArea" style="display:none;margin-top:8px;flex-direction:column;gap:6px;">
-            <div style="display:flex;align-items:center;gap:6px;">
-              <button type="button" id="catMoveUpBtn" title="往上移" style="background:none;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↑</button>
-              <button type="button" id="catMoveDownBtn" title="往下移" style="background:none;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↓</button>
-              <span style="font-size:10px;color:#94a3b8;">調整「<span id="catMoveTarget"></span>」的顯示順序，知識庫也會同步</span>
-            </div>
-            <div>
-              <button type="button" id="catDeleteBtn" style="background:none;border:1px solid #fecaca;color:var(--red);font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit;">🗑 刪除「<span id="catDeleteTarget"></span>」</button>
-              <span style="font-size:10px;color:#94a3b8;margin-left:6px;">只能刪除沒有任何知識卡在用、也沒有子類的分類</span>
-            </div>
-          </div>
+          <button type="button" id="catDeleteBtn" style="background:#fff;border:1px solid #fecaca;color:var(--red);font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit;">🗑 刪除「<span id="catDeleteTarget"></span>」</button>
+          <span style="font-size:10px;color:#94a3b8;margin-left:6px;">只能刪除沒有任何知識卡在用、也沒有子類的分類</span>
         </div>
-
-        <div style="border-top:1px solid var(--border);padding-top:12px;">
-          <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:8px;">改成什麼</label>
-          <div id="catRenameNewParentWrap">
-            <div id="catRenameLockedParent" style="display:none;padding:8px 10px;background:var(--cream);border-radius:8px;font-size:13px;color:var(--slate);margin-bottom:8px;"></div>
-            <div id="catRenameNewParentTree"></div>
-            <div id="catRenameNewParentTextArea">
-              <input type="text" id="catRenameNewParentText" placeholder="輸入新名字" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;margin-top:8px;" />
-            </div>
-          </div>
-          <div id="catRenameNewChildArea" style="margin-top:8px;">
-            <label style="font-size:11px;color:var(--slate);display:block;margin-bottom:4px;" id="catRenameNewChildLabel">名字</label>
-            <input type="text" id="catRenameNewChildText" placeholder="例：接機" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;" />
-          </div>
-        </div>
-
-        <div id="catRenamePreview" style="font-size:11px;color:#94a3b8;"></div>
-        <div style="font-size:11px;color:#94a3b8;">會同步更新 Categories 清單，以及所有已經貼上這個分類的知識卡，不會有殘留舊名稱的資料；如果新名稱剛好已經存在，會直接合併成一個。</div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:20px;">
-        <div style="flex:1"></div>
+    </div>
+    <div class="cat-col cat-col-right">
+      <div>
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">要做什麼</label>
+        <select id="catRenameScope" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+          <option value="parent">改大類名字（底下所有相關的一起換）</option>
+          <option value="renameOnly">只改名字，位置不動</option>
+          <option value="move">搬到別的大類底下</option>
+        </select>
+        <div id="catRenameScopeHint" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:12px;">
+        <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:8px;">改成什麼</label>
+        <div id="catRenameNewParentWrap">
+          <div id="catRenameLockedParent" style="display:none;padding:8px 10px;background:#fff;border-radius:8px;font-size:13px;color:var(--slate);margin-bottom:8px;border:1px solid var(--border);"></div>
+          <div id="catRenameNewParentTree" style="background:#fff;border-radius:8px;"></div>
+          <div id="catRenameNewParentTextArea">
+            <input type="text" id="catRenameNewParentText" placeholder="輸入新名字" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;margin-top:8px;box-sizing:border-box;" />
+          </div>
+        </div>
+        <div id="catRenameNewChildArea" style="margin-top:8px;">
+          <label style="font-size:11px;color:var(--slate);display:block;margin-bottom:4px;" id="catRenameNewChildLabel">名字</label>
+          <input type="text" id="catRenameNewChildText" placeholder="例：接機" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;" />
+        </div>
+      </div>
+
+      <div id="catRenamePreview" style="font-size:11px;color:#94a3b8;"></div>
+      <div style="font-size:11px;color:#94a3b8;">會同步更新 Categories 清單，以及所有已經貼上這個分類的知識卡，不會有殘留舊名稱的資料；如果新名稱剛好已經存在，會直接合併成一個。</div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button id="catRenameCancel" style="background:none;border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--slate);">取消</button>
         <button id="catRenameConfirm" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">重新命名</button>
       </div>
@@ -1325,7 +1328,7 @@ function switchTab(name) {
   if ((name === 'cat' || name === 'delete') && !checkCatManageAuth()) return;
 
   document.getElementById('tabPanelAdd').style.display    = name === 'add'    ? '' : 'none';
-  document.getElementById('tabPanelCat').style.display     = name === 'cat'    ? 'block' : 'none';
+  document.getElementById('tabPanelCat').style.display     = name === 'cat'    ? 'flex' : 'none';
   document.getElementById('tabPanelDelete').style.display  = name === 'delete' ? 'block' : 'none';
   document.getElementById('topTabAdd').classList.toggle('active', name === 'add');
   document.getElementById('topTabCat').classList.toggle('active', name === 'cat');
@@ -1368,8 +1371,8 @@ function returnToTriggerCard() {
 
 function switchCatTab(mode) {
   const isAdd = mode === 'add';
-  document.getElementById('catAddPane').style.display = isAdd ? 'block' : 'none';
-  document.getElementById('catRenamePane').style.display = isAdd ? 'none' : 'block';
+  document.getElementById('catAddPane').style.display = isAdd ? 'grid' : 'none';
+  document.getElementById('catRenamePane').style.display = isAdd ? 'none' : 'grid';
   document.getElementById('catTabAdd').style.background = isAdd ? 'var(--navy)' : '#fff';
   document.getElementById('catTabAdd').style.color = isAdd ? '#fff' : 'var(--slate)';
   document.getElementById('catTabRename').style.background = isAdd ? '#fff' : 'var(--navy)';
@@ -2120,7 +2123,7 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     const res = await fetchWithTimeout(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts }] }) },
-      60000
+      150000
     );
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
@@ -2398,7 +2401,7 @@ async function checkSemanticConflicts(rows) {
   const res = await fetchWithTimeout(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) },
-    60000
+    90000
   );
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
