@@ -74,7 +74,7 @@
     .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
     /* CATEGORY CHECKBOXES */
-    .cat-grid{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;}
+    .cat-grid{padding:8px 0;}
     .cat-chip{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;color:var(--slate);background:#fff;transition:all .15s;user-select:none;}
 
     /* 分類樹狀元件 */
@@ -106,6 +106,33 @@
     .cat-tree.single .cat-tree-parent-row.selected .cat-tree-parent-label{color:#fff;}
     .cat-tree-new-node{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--gold);font-weight:600;transition:background .12s;}
     .cat-tree-new-node:hover{background:var(--cream);}
+
+    /* 新版類別選單：左右分欄（左＝大類，右＝子類），搜尋時右欄變成扁平比對結果 */
+    .cat-picker{border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden;}
+    .cat-picker-search{width:100%;padding:8px 10px;border:none;border-bottom:1px solid var(--border);font-size:12px;font-family:inherit;box-sizing:border-box;}
+    .cat-picker-search:focus{outline:none;background:var(--cream);}
+    .cat-picker-tags{display:flex;flex-wrap:wrap;gap:5px;padding:8px 8px 0;}
+    .cat-picker-tag{display:inline-flex;align-items:center;gap:4px;background:var(--cream);border:1px solid var(--border);color:var(--navy);font-size:11px;font-weight:600;padding:3px 4px 3px 8px;border-radius:12px;}
+    .cat-picker-tag-x{cursor:pointer;color:var(--slate);font-size:10px;padding:1px 4px;border-radius:50%;transition:background .12s;}
+    .cat-picker-tag-x:hover{background:#e2e8f0;color:var(--red);}
+    .cat-picker-body{display:flex;height:170px;}
+    .cat-picker-parents{width:38%;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;}
+    .cat-picker-parent-row{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:7px 9px;font-size:12px;color:var(--slate);cursor:pointer;transition:background .12s;border-left:2px solid transparent;}
+    .cat-picker-parent-row:hover{background:var(--cream);}
+    .cat-picker-parent-row.active{background:var(--cream);border-left-color:var(--gold);color:var(--navy);font-weight:700;}
+    .cat-picker-parent-count{font-size:10px;color:#94a3b8;flex-shrink:0;}
+    .cat-picker-parent-row.active .cat-picker-parent-count{color:var(--gold);font-weight:700;}
+    .cat-picker-parent-row input[type=checkbox]{accent-color:var(--gold);width:12px;height:12px;cursor:pointer;flex-shrink:0;}
+    .cat-picker-children{flex:1;overflow-y:auto;padding:6px;}
+    .cat-picker-children-head{display:flex;justify-content:space-between;align-items:center;padding:2px 4px 6px;}
+    .cat-picker-children-title{font-size:11px;font-weight:700;color:var(--navy);}
+    .cat-picker-selectall{font-size:10px;color:var(--gold);cursor:pointer;padding:2px 6px;border-radius:10px;transition:background .12s;}
+    .cat-picker-selectall:hover{background:var(--cream);}
+    .cat-picker-leaf-row, .cat-picker-flat-row{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--slate);transition:background .12s;}
+    .cat-picker-leaf-row:hover, .cat-picker-flat-row:hover{background:var(--cream);}
+    .cat-picker input[type=checkbox]{accent-color:var(--gold);width:13px;height:13px;cursor:pointer;flex-shrink:0;}
+    .cat-picker-empty{padding:16px;text-align:center;font-size:11px;color:#94a3b8;}
+    .cat-picker-flat-parent{font-size:10px;color:#94a3b8;margin-left:auto;flex-shrink:0;}
     .cat-group-label{width:100%;font-size:9.5px;font-weight:700;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;margin:6px 0 -2px;}
     .cat-group-label:first-child{margin-top:0;}
     .edit-chip-like{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:11px;color:var(--slate);background:#fff;transition:all .15s;user-select:none;margin:2px;}
@@ -786,8 +813,7 @@ let memoCatSelected = new Set();   // Memo 層級目前勾選的類別（樹狀�
 
 function renderCatGrid() {
   const grid = document.getElementById('catGrid');
-  renderCatTree(grid, categories, {
-    mode: 'multi',
+  renderCatPicker(grid, categories, {
     selected: memoCatSelected,
     onChange: (cat, checked) => { if (checked) memoCatSelected.add(cat); else memoCatSelected.delete(cat); }
   });
@@ -815,6 +841,151 @@ function groupCategories(cats) {
     }
   });
   return { groups, groupOrder, standalone };
+}
+
+// ===================================================
+// 類別選單（左右分欄版）：左邊大類、右邊子類，搜尋時右邊變成扁平比對結果。
+// 專門給「多選」情境用（新增知識卡的單張卡片、Memo 預設類別）。
+// 類別管理彈窗的單選（選大類/搬類別）維持用下面的 renderCatTree，兩者用途不同、不共用。
+// container: 要塞進去的 DOM 元素
+// cats: 完整類別字串陣列
+// opts.selected: Set，目前勾選的類別（直接被這個函式修改，呼叫端傳進來的是同一顆物件還是快照，
+//   由呼叫端自己決定——這個元件只負責讀寫它拿到的那顆 Set，並透過 onChange 通知呼叫端）
+// opts.onChange(cat, checked): 勾選變動時呼叫
+// ===================================================
+function renderCatPicker(container, cats, opts) {
+  const selectedSet = opts.selected || new Set();
+  const { groups, groupOrder, standalone } = groupCategories(cats);
+  let activeParent = groupOrder[0] || null;
+  let searchTerm = '';
+  let searchFocused = false;
+
+  function countSelected(parent) {
+    return (groups[parent] || []).filter(({full}) => selectedSet.has(full)).length;
+  }
+
+  function tagsHtml() {
+    const items = [...selectedSet];
+    if (!items.length) return '';
+    return '<div class="cat-picker-tags">' + items.map(c =>
+      `<span class="cat-picker-tag" data-remove-cat="${esc(c)}">${esc(c)}<span class="cat-picker-tag-x">✕</span></span>`
+    ).join('') + '</div>';
+  }
+
+  function bodyHtml() {
+    const term = searchTerm.trim().toLowerCase();
+    if (term) {
+      // 搜尋模式：全部類別攤平比對，跳過「先選大類」
+      const matches = cats.filter(c => c.toLowerCase().includes(term));
+      if (!matches.length) return '<div class="cat-picker-empty">沒有符合「' + esc(searchTerm) + '」的類別</div>';
+      return '<div class="cat-picker-children" style="width:100%;">' + matches.map(full => {
+        const slashIdx = full.indexOf('/');
+        const label = slashIdx > 0 ? full.slice(slashIdx+1) : full;
+        const parentLabel = slashIdx > 0 ? full.slice(0, slashIdx) : '';
+        const checked = selectedSet.has(full) ? 'checked' : '';
+        return `<label class="cat-picker-flat-row" data-cat="${esc(full)}">
+          <input type="checkbox" ${checked} />
+          <span>${esc(label)}</span>
+          ${parentLabel ? `<span class="cat-picker-flat-parent">${esc(parentLabel)}</span>` : ''}
+        </label>`;
+      }).join('') + '</div>';
+    }
+
+    const parentsHtml = standalone.map(c => {
+      const checked = selectedSet.has(c) ? 'checked' : '';
+      return `<label class="cat-picker-parent-row" data-cat="${esc(c)}">
+        <input type="checkbox" ${checked} />
+        <span style="flex:1">${esc(c)}</span>
+      </label>`;
+    }).join('') + groupOrder.map(parent => {
+      const active = parent === activeParent ? 'active' : '';
+      const n = countSelected(parent);
+      const total = groups[parent].length;
+      return `<div class="cat-picker-parent-row ${active}" data-parent="${esc(parent)}">
+        <span style="flex:1">${esc(parent)}</span>
+        <span class="cat-picker-parent-count">${n > 0 ? n + '/' + total : total}</span>
+      </div>`;
+    }).join('');
+
+    const activeChildren = activeParent ? (groups[activeParent] || []) : [];
+    const childrenHtml = activeParent ? `
+      <div class="cat-picker-children-head">
+        <span class="cat-picker-children-title">${esc(activeParent)}</span>
+        <span class="cat-picker-selectall" data-selectall="${esc(activeParent)}">全選</span>
+      </div>
+      ${activeChildren.map(({full, child}) => {
+        const checked = selectedSet.has(full) ? 'checked' : '';
+        return `<label class="cat-picker-leaf-row" data-cat="${esc(full)}">
+          <input type="checkbox" ${checked} />
+          <span>${esc(child)}</span>
+        </label>`;
+      }).join('')}
+    ` : '<div class="cat-picker-empty">左邊點一個大類看子類</div>';
+
+    return `<div class="cat-picker-body">
+      <div class="cat-picker-parents">${parentsHtml}</div>
+      <div class="cat-picker-children">${childrenHtml}</div>
+    </div>`;
+  }
+
+  function render() {
+    container.innerHTML = `<div class="cat-picker">
+      <input type="text" class="cat-picker-search" placeholder="搜尋類別..." value="${esc(searchTerm)}" />
+      ${tagsHtml()}
+      ${bodyHtml()}
+    </div>`;
+
+    const searchEl = container.querySelector('.cat-picker-search');
+    // 打字時每個字都會觸發重繪，這裡把焦點跟游標位置補回去，不然每打一個字焦點就跑掉
+    if (searchFocused) {
+      searchEl.focus();
+      const pos = searchEl.value.length;
+      searchEl.setSelectionRange(pos, pos);
+    }
+
+    searchEl.addEventListener('focus', () => { searchFocused = true; });
+    searchEl.addEventListener('blur', () => { searchFocused = false; });
+    searchEl.addEventListener('input', () => { searchTerm = searchEl.value; render(); });
+
+    container.querySelectorAll('[data-remove-cat]').forEach(tag => {
+      tag.addEventListener('click', () => {
+        const cat = tag.dataset.removeCat;
+        selectedSet.delete(cat);
+        opts.onChange(cat, false);
+        render();
+      });
+    });
+
+    container.querySelectorAll('.cat-picker-parent-row[data-parent]').forEach(row => {
+      row.addEventListener('click', () => { activeParent = row.dataset.parent; render(); });
+    });
+
+    container.querySelectorAll('.cat-picker-parent-row input[type=checkbox], .cat-picker-leaf-row input[type=checkbox], .cat-picker-flat-row input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('click', e => e.stopPropagation());
+      cb.addEventListener('change', () => {
+        const cat = cb.closest('[data-cat]').dataset.cat;
+        if (cb.checked) selectedSet.add(cat); else selectedSet.delete(cat);
+        opts.onChange(cat, cb.checked);
+        render();
+      });
+    });
+
+    container.querySelectorAll('[data-selectall]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const parent = el.dataset.selectall;
+        const children = groups[parent] || [];
+        const allChecked = children.every(({full}) => selectedSet.has(full));
+        children.forEach(({full}) => {
+          if (allChecked) selectedSet.delete(full); else selectedSet.add(full);
+          opts.onChange(full, !allChecked);
+        });
+        render();
+      });
+    });
+  }
+
+  render();
 }
 
 // ===================================================
@@ -1403,8 +1574,7 @@ function renderItems() {
 
     // 用樹狀元件渲染這張卡片的類別選擇（多選），選取狀態直接綁定回 items[i].categories
     const catGridEl = card.querySelector('.cat-grid[data-item-idx]');
-    renderCatTree(catGridEl, categories, {
-      mode: 'multi',
+    renderCatPicker(catGridEl, categories, {
       selected: new Set(item.categories),
       onChange: (cat, checked) => {
         if (checked) { if (!items[i].categories.includes(cat)) items[i].categories.push(cat); }
