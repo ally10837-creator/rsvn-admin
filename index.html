@@ -786,6 +786,78 @@ function setupDateCombo(fieldId) {
 setupDateCombo('memoDate');
 setupDateCombo('memoExpiry');
 
+// ===================================================
+// Memo 生效起始日/截止日事後修改：跳出彈窗，列出所有卡片讓你勾選要不要套用新值
+// 跟 Memo 舊值相同的卡片預設勾選（看起來還沒調整過）；已經跟舊值不同的卡片也會列出來，
+// 只是預設不勾，是不是要一起套用由你自己決定，不會被自動排除也不會被自動覆蓋
+// ===================================================
+let lastMemoDate = '';
+let lastMemoExpiry = '';
+function initMemoDateTracking() {
+  lastMemoDate = document.getElementById('memoDate').value;
+  lastMemoExpiry = document.getElementById('memoExpiry').value;
+}
+
+let dateApplyState = { field: '', newValue: '', oldValue: '' };
+
+function checkMemoDateBulkUpdate(field) {
+  const el = document.getElementById(field === 'date' ? 'memoDate' : 'memoExpiry');
+  const newValue = el.value;
+  const oldValue = field === 'date' ? lastMemoDate : lastMemoExpiry;
+
+  if (newValue !== oldValue && items.length && newValue) {
+    openDateApplyModal(field, oldValue, newValue);
+  }
+  if (field === 'date') lastMemoDate = newValue; else lastMemoExpiry = newValue;
+}
+
+function openDateApplyModal(field, oldValue, newValue) {
+  dateApplyState = { field, newValue, oldValue };
+  const label = field === 'date' ? '生效起始日' : '生效截止日';
+  document.getElementById('dateApplyTitle').textContent = 'Memo 的' + label + '改成了 ' + newValue + '，要套用到哪些知識卡？';
+
+  const listEl = document.getElementById('dateApplyList');
+  listEl.innerHTML = items.map((k, i) => {
+    const current = k[field] || '';
+    const matchesOld = current === oldValue;
+    const checked = matchesOld ? 'checked' : '';
+    const noteHtml = matchesOld
+      ? '<span style="font-size:10.5px;color:#94a3b8;">目前：' + esc(current || '空白') + '</span>'
+      : '<span style="font-size:10.5px;color:var(--gold);">目前：' + esc(current || '空白') + '（已手動調整過）</span>';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--border);font-size:12.5px;cursor:pointer;">' +
+      '<input type="checkbox" data-date-apply-idx="' + i + '" ' + checked + ' />' +
+      '<span style="flex:1;">第 ' + (i+1) + ' 條「' + esc(k.title || '（未命名）') + '」</span>' +
+      noteHtml +
+    '</label>';
+  }).join('');
+
+  document.getElementById('dateApplyOverlay').style.display = 'flex';
+}
+
+function dateApplySetAll(checked) {
+  document.querySelectorAll('#dateApplyList input[type=checkbox]').forEach(cb => { cb.checked = checked; });
+}
+
+function closeDateApplyModal() {
+  document.getElementById('dateApplyOverlay').style.display = 'none';
+}
+
+function confirmDateApplyModal() {
+  const { field, newValue } = dateApplyState;
+  document.querySelectorAll('#dateApplyList input[type=checkbox]:checked').forEach(cb => {
+    const i = Number(cb.dataset.dateApplyIdx);
+    if (items[i]) items[i][field] = newValue;
+  });
+  closeDateApplyModal();
+  renderItems();
+}
+
+document.getElementById('memoDate').addEventListener('blur', () => checkMemoDateBulkUpdate('date'));
+document.getElementById('memoDate_native').addEventListener('change', () => checkMemoDateBulkUpdate('date'));
+document.getElementById('memoExpiry').addEventListener('blur', () => checkMemoDateBulkUpdate('expiry'));
+document.getElementById('memoExpiry_native').addEventListener('change', () => checkMemoDateBulkUpdate('expiry'));
+document.getElementById('dateApplyOverlay').addEventListener('click', e => { if (e.target.id === 'dateApplyOverlay') closeDateApplyModal(); });
+
 // 預設今天
 function getLocalDateStr(d) {
   const y = d.getFullYear();
@@ -797,6 +869,7 @@ const todayStr = getLocalDateStr(new Date());
 document.getElementById('memoDate').value = todayStr;
 document.getElementById('memoDate_native').value = todayStr;
 document.getElementById('memoDate').classList.add('valid');
+initMemoDateTracking();
 
 
 
@@ -1491,10 +1564,14 @@ let items = [];   // [{title, content, categories[], keywords, imageFile, imageU
 function addItem() {
   const cats = getSelectedCats();
   const memoDateEl = document.getElementById('memoDate');
+  const memoExpiryEl = document.getElementById('memoExpiry');
   items.push({
     title: '', content: '',
     categories: cats.length ? [...cats] : [],
-    keywords: '', imageFile: null, imageUrl: '', imageBase64: null, imageMediaType: '', imagePreviewUrl: '', expiry: '',
+    keywords: '', imageFile: null, imageUrl: '', imageBase64: null, imageMediaType: '', imagePreviewUrl: '',
+    // Memo 的統一截止日只在「新卡片剛建立」這一刻拿來預填，讓使用者看得到、隨時能清空調整；
+    // 不會再像以前那樣在送出時偷偷 fallback 蓋掉這裡顯示的值——這個欄位看到什麼，送出就是什麼
+    expiry: (memoExpiryEl && memoExpiryEl.value) || '',
     date: (memoDateEl && memoDateEl.value) || todayStr
   });
   renderItems();
@@ -1631,7 +1708,7 @@ function renderItems() {
         </div>
         <div class="k-row">
           <div class="fg" style="margin:0">
-            <label>知識卡生效截止日（個別設定，留空則套用上方 Memo 的統一生效截止日）</label>
+            <label>知識卡生效截止日</label>
             <div class="date-combo">
               <input type="text" id="itemExpiry_${i}" value="${esc(item.expiry||'')}" placeholder="YYYY-MM-DD 或留空" maxlength="10" inputmode="numeric" />
               <button type="button" class="date-pick-btn" data-target="itemExpiry_${i}" title="開啟日期選擇器">
@@ -1639,7 +1716,7 @@ function renderItems() {
               </button>
               <input type="date" id="itemExpiry_${i}_native" class="date-native-hidden" tabindex="-1" />
             </div>
-            <div class="k-hint">若這則知識沒有生效截止日，請留空</div>
+            <div class="k-hint">留空＝這則知識沒有截止日；新增卡片時會先帶入 Memo 的統一截止日方便微調，但這裡顯示什麼，送出時就存什麼，不會再被 Memo 的設定蓋掉</div>
           </div>
         </div>
       </div>`;
@@ -1890,8 +1967,10 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     memoContextLine,
     '請把內容拆解成員工可以獨立查詢的知識條目，數量依內容豐富度自行判斷，不要被固定條數限制住：內容單純的 memo 可能 2-3 條就夠，但像對照表、交叉比較表這種資訊密集的來源，拆到 10-20 條以上都合理。',
     '每一條的判斷原則是「能不能被獨立搜尋、獨立查閱」——不同會員等級、不同權益類型、不同規則就該分開成不同條，不要為了湊進少量條目把不相關的規則硬塞在同一條裡，那樣之後搜尋會不準。',
-    '每條需包含 title（10字內）、content（80-200字口語化）、keywords（5-8個逗號分隔關鍵字）。',
+    '特別注意：即使幾個規則主題相關（例如都跟「積分」有關），只要它們是「不同維度」的規則（例如：住宿積分 vs 餐飲積分、舊制 vs 新制、不同會員等級的同一項權益），也要拆成不同條目，不要因為主題相近就合併。判斷標準很簡單：如果同仁會分開問「住宿怎麼算點數」跟「餐飲怎麼算點數」這兩個不同問題，這就該是兩張知識卡，不是一張卡硬塞兩件事。',
+    '每條需包含 title（10字內）、content（80-200字）、keywords（5-8個逗號分隔關鍵字）。',
     '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
+    '如果拆到最細之後，這一條裡面還是天生包含多個並列的子項（例如同一條規則本身就是「舊制 vs 新制」的對照、或同一個項目在不同條件下的數字列表），content 請用條列格式呈現，每個子項獨立一行、開頭直接是關鍵數字或差異點，不要寫成一整段夾雜逗號的長句；如果這條知識本來就只講一件事，維持簡短口語化的一兩句話就好，不要為了格式統一硬拆成條列。',
     '另外請幫每條知識判斷 date（起始日，這條知識何時開始適用，YYYY-MM-DD 格式；如果內容沒有明確日期，就填今天 ' + todayStr + '）',
     '和 expiry（截止日，這條知識何時失效，YYYY-MM-DD 格式；如果內容是長期適用、沒有明確截止日期，這個欄位請留空字串，不要亂猜一個日期）。',
     '不管這份 Memo 的名稱是你自己建議的、還是使用者已經填的，每一條 items 的 keywords 都要包含這個 Memo 名稱本身（或其核心關鍵字）。標題不用強求跟名稱一樣的字眼，各自用最貼切的說法即可，但關鍵字要能錨定回這個名稱，確保同事不管記得的是哪個說法，都能搜尋到這一整批知識。',
@@ -2018,7 +2097,9 @@ function submitAll() {
     link: '',
     keywords: k.keywords,
     memo: title,
-    expiry: k.expiry || expiry || ''
+    // expiry 不再 fallback 套用 Memo 統一截止日——這個欄位在畫面上看到的值（包含 AI 判斷、
+    // 手動調整、或刻意清空）就是最終存進去的值，Memo 的截止日只在新卡片剛建立時預填一次（見 addItem()）
+    expiry: k.expiry || ''
   }));
 
   // #3：送出前先比對現有知識，標題完全相同或關鍵字高度重疊就提醒使用者確認
@@ -2235,6 +2316,7 @@ function resetAll() {
   renderFileList();
   items = [];
   renderItems();
+  initMemoDateTracking();
 }
 
 // 注意：btnSubmit（onclick="submitAll()"）和 btnClearAll（onclick="resetAll()"）
@@ -2492,5 +2574,24 @@ document.getElementById('delBatchDelete').addEventListener('click', () => {
 console.log('ADMIN FULLY BUILT - all steps integrated successfully');
 </script>
 <!-- 分頁架構：新增知識卡／類別管理／知識卡管理，三個 tabPanel 用 switchTab() 切換 -->
+<!-- Memo 生效日期批次套用彈窗：改 Memo 起始/截止日時，可以勾選要一起套用新值的知識卡 -->
+<div id="dateApplyOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,42,69,.5);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:520px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="padding:18px 20px 12px;border-bottom:1px solid var(--border);">
+      <div style="font-size:14px;font-weight:700;color:var(--navy);" id="dateApplyTitle"></div>
+      <div style="font-size:11px;color:var(--slate);margin-top:4px;">跟 Memo 舊值相同的卡片已幫你預先勾選（看起來還沒調整過）；已經跟舊值不同的卡片也列出來了，只是預設不勾，你可以自己決定要不要一起套用</div>
+    </div>
+    <div style="padding:10px 20px;display:flex;gap:14px;border-bottom:1px solid var(--border);">
+      <span style="font-size:11px;color:var(--gold);cursor:pointer;font-weight:600;" onclick="dateApplySetAll(true)">全選</span>
+      <span style="font-size:11px;color:var(--slate);cursor:pointer;font-weight:600;" onclick="dateApplySetAll(false)">取消全選</span>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:4px 20px;" id="dateApplyList"></div>
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;">
+      <button type="button" onclick="closeDateApplyModal()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:12.5px;color:var(--slate);cursor:pointer;font-family:inherit;">取消，不套用</button>
+      <button type="button" onclick="confirmDateApplyModal()" class="btn btn-navy" style="padding:8px 18px;font-size:12.5px;">套用到勾選的卡片</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
