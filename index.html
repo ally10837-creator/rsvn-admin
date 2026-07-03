@@ -1819,7 +1819,10 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
       date: it.date || defaultDate,     // AI 判斷的起始日，判斷不出來就用 Memo 的起始日
       expiry: it.expiry || ''           // AI 判斷的截止日，判斷不出來就留空＝沒有期限，不硬猜
     }));
-    items = items.concat(newItems);
+    // 如果目前的卡片裡有「使用者完全沒動過」的空白卡（預設那張、或按了+但沒填的），
+    // 讓 AI 產生的知識卡從那張開始填，而不是維持空白、AI 結果全部往後疊加
+    const isUntouchedBlank = it => !it.title.trim() && !it.content.trim() && !it.keywords.trim();
+    items = items.filter(it => !isUntouchedBlank(it)).concat(newItems);
     renderItems();
     alert('Gemini \u7522\u751f\u4e86 ' + newItems.length + ' \u689d\u77e5\u8b58\u689d\u76ee');
   } catch(err) {
