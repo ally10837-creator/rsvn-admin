@@ -856,7 +856,7 @@ document.getElementById('memoDate').addEventListener('blur', () => checkMemoDate
 document.getElementById('memoDate_native').addEventListener('change', () => checkMemoDateBulkUpdate('date'));
 document.getElementById('memoExpiry').addEventListener('blur', () => checkMemoDateBulkUpdate('expiry'));
 document.getElementById('memoExpiry_native').addEventListener('change', () => checkMemoDateBulkUpdate('expiry'));
-document.getElementById('dateApplyOverlay').addEventListener('click', e => { if (e.target.id === 'dateApplyOverlay') closeDateApplyModal(); });
+document.body.addEventListener('click', e => { if (e.target.id === 'dateApplyOverlay') closeDateApplyModal(); });
 
 // 預設今天
 function getLocalDateStr(d) {
