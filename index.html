@@ -376,7 +376,7 @@
 
     <div class="row2">
       <div class="fg">
-        <label>起始日</label>
+        <label>Memo 生效起始日</label>
         <div class="date-combo">
           <input type="text" id="memoDate" placeholder="YYYY-MM-DD 或輸入 8 碼數字" maxlength="10" inputmode="numeric" />
           <button type="button" class="date-pick-btn" data-target="memoDate" title="開啟日期選擇器">
@@ -386,7 +386,7 @@
         </div>
       </div>
       <div class="fg">
-        <label>截止日</label>
+        <label>Memo 生效截止日</label>
         <div class="date-combo">
           <input type="text" id="memoExpiry" placeholder="YYYY-MM-DD 或輸入 8 碼數字" maxlength="10" inputmode="numeric" />
           <button type="button" class="date-pick-btn" data-target="memoExpiry" title="開啟日期選擇器">
@@ -394,7 +394,7 @@
           </button>
           <input type="date" id="memoExpiry_native" class="date-native-hidden" tabindex="-1" />
         </div>
-        <div class="k-hint">若這則知識沒有截止日，請留空</div>
+        <div class="k-hint">若這則知識沒有生效截止日，請留空</div>
       </div>
     </div>
 
@@ -1613,7 +1613,7 @@ function renderItems() {
         </div>
         <div class="k-row">
           <div class="fg" style="margin:0">
-            <label>起始日 *</label>
+            <label>知識卡生效起始日 *</label>
             <div class="date-combo">
               <input type="text" id="itemDate_${i}" value="${esc(item.date||'')}" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" />
               <button type="button" class="date-pick-btn" data-target="itemDate_${i}" title="開啟日期選擇器">
@@ -1621,12 +1621,12 @@ function renderItems() {
               </button>
               <input type="date" id="itemDate_${i}_native" class="date-native-hidden" tabindex="-1" />
             </div>
-            <div class="k-hint">預設為 Memo 起始日，可個別調整</div>
+            <div class="k-hint">預設為 Memo 生效起始日，可個別調整</div>
           </div>
         </div>
         <div class="k-row">
           <div class="fg" style="margin:0">
-            <label>截止日（個別設定，留空則套用上方 Memo 的統一截止日）</label>
+            <label>知識卡生效截止日（個別設定，留空則套用上方 Memo 的統一生效截止日）</label>
             <div class="date-combo">
               <input type="text" id="itemExpiry_${i}" value="${esc(item.expiry||'')}" placeholder="YYYY-MM-DD 或留空" maxlength="10" inputmode="numeric" />
               <button type="button" class="date-pick-btn" data-target="itemExpiry_${i}" title="開啟日期選擇器">
@@ -1634,7 +1634,7 @@ function renderItems() {
               </button>
               <input type="date" id="itemExpiry_${i}_native" class="date-native-hidden" tabindex="-1" />
             </div>
-            <div class="k-hint">若這則知識沒有截止日，請留空</div>
+            <div class="k-hint">若這則知識沒有生效截止日，請留空</div>
           </div>
         </div>
       </div>`;
@@ -1888,11 +1888,17 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
     '另外請幫每條知識判斷 date（起始日，這條知識何時開始適用，YYYY-MM-DD 格式；如果內容沒有明確日期，就填今天 ' + todayStr + '）',
     '和 expiry（截止日，這條知識何時失效，YYYY-MM-DD 格式；如果內容是長期適用、沒有明確截止日期，這個欄位請留空字串，不要亂猜一個日期）。',
-    '不管這份 Memo 的名稱是你自己建議的、還是使用者已經填的，每一條 items 的 keywords 都要包含這個 Memo 名稱本身（或其核心關鍵字）。標題不用強求跟名稱一樣的字眼，各自用最貼切的說法即可，但關鍵字要能錨定回這個名稱，確保同事不管記得的是哪個說法，都能搜尋到這一整批知識。'
+    '不管這份 Memo 的名稱是你自己建議的、還是使用者已經填的，每一條 items 的 keywords 都要包含這個 Memo 名稱本身（或其核心關鍵字）。標題不用強求跟名稱一樣的字眼，各自用最貼切的說法即可，但關鍵字要能錨定回這個名稱，確保同事不管記得的是哪個說法，都能搜尋到這一整批知識。',
+    '',
+    '現有的類別清單（大類/子類，斜線代表階層，只有這些是有效類別，不要自己發明新的）：',
+    categories.map(c => '- ' + c).join('\n'),
+    '',
+    '請幫每一條知識判斷 categories（陣列，1-3 個，必須是上面清單裡「完整」的字串，例如 "房型/床型與可住人數"，不要只寫大類、也不要寫清單以外的名稱）。',
+    '同一份 Memo 底下不同條目可以有不同類別——不用全部套用同一組，依每條實際內容各自判斷最貼切的子類。判斷不出來、或內容真的橫跨太多子類時，這條可以先留空陣列，使用者送出前還是會逐條檢查。'
   ];
   if (docxTexts.length) { promptLines.push('Word 檔案內容：'); promptLines.push(docxTexts.join('\n\n')); }
   if (text) { promptLines.push('文字補充：'); promptLines.push(text); }
-  promptLines.push('只回傳 JSON，格式為 {"memoTitle": "...", "items": [...]}，memoTitle 是你建議的 Memo 標題（如果上面已經有標題了，這裡就照抄原標題），items 陣列每個物件含 title、content、keywords、date、expiry。');
+  promptLines.push('只回傳 JSON，格式為 {"memoTitle": "...", "items": [...]}，memoTitle 是你建議的 Memo 標題（如果上面已經有標題了，這裡就照抄原標題），items 陣列每個物件含 title、content、keywords、date、expiry、categories（陣列）。');
   parts.push({ text: promptLines.join('\n') });
 
   try {
@@ -1914,13 +1920,19 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
 
     const memoDateEl2 = document.getElementById('memoDate');
     const defaultDate = (memoDateEl2 && memoDateEl2.value) || todayStr;
-    const newItems = (parsed.items || []).map(it => ({
-      title: it.title||'', content: it.content||'',
-      categories: [...cats], keywords: it.keywords||'',
-      imageFile: null, imageUrl: '', imageBase64: null, imageMediaType: '', imagePreviewUrl: '',
-      date: it.date || defaultDate,     // AI 判斷的起始日，判斷不出來就用 Memo 的起始日
-      expiry: it.expiry || ''           // AI 判斷的截止日，判斷不出來就留空＝沒有期限，不硬猜
-    }));
+    const catSet = new Set(categories);
+    const newItems = (parsed.items || []).map(it => {
+      // AI 判斷的類別先過濾一次，只留真的存在於現有清單裡的（防止 AI 幻覺出清單以外的名稱），
+      // 完全沒有有效值才退回 memo 層級預設值當底線，確保不會有卡片完全沒類別
+      const aiCats = Array.isArray(it.categories) ? it.categories.filter(c => catSet.has(c)) : [];
+      return {
+        title: it.title||'', content: it.content||'',
+        categories: aiCats.length ? aiCats : [...cats], keywords: it.keywords||'',
+        imageFile: null, imageUrl: '', imageBase64: null, imageMediaType: '', imagePreviewUrl: '',
+        date: it.date || defaultDate,     // AI 判斷的起始日，判斷不出來就用 Memo 的起始日
+        expiry: it.expiry || ''           // AI 判斷的截止日，判斷不出來就留空＝沒有期限，不硬猜
+      };
+    });
     // 如果目前的卡片裡有「使用者完全沒動過」的空白卡（預設那張、或按了+但沒填的），
     // 讓 AI 產生的知識卡從那張開始填，而不是維持空白、AI 結果全部往後疊加
     const isUntouchedBlank = it => !it.title.trim() && !it.content.trim() && !it.keywords.trim();
@@ -2178,7 +2190,7 @@ async function checkSemanticConflicts(rows) {
 
 function doSubmit(rows, filesPayload, title, date, cats, btn, spin, staffName) {
 
-  gasCall('saveKnowledge', { payload: { rows: rows, files: filesPayload, memoTitle: title, memoDate: date, memoCats: cats, submittedBy: staffName } })
+  gasCall('saveKnowledge', { payload: { rows: rows, files: filesPayload, memoTitle: title, memoDate: date, memoExpiry: expiry, memoCats: cats, submittedBy: staffName } })
     .then(function(result) {
       if (spin) spin.classList.remove('show');
       if (btn) btn.disabled = false;
