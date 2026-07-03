@@ -413,6 +413,7 @@
     <div class="spin" id="submitSpin"></div>
   </button>
 </div>
+</div>
 
 <!-- /TAB PANEL：新增知識卡 -->
 
@@ -509,7 +510,7 @@
 </div>
 
 
-<!-- TAB PANEL：知識卡管理（多條件篩選 + 勾選批次刪除 / 匯出） -->
+<!-- TAB PANEL：知識卡管理（多條件篩選 + 勾選批次刪除 / 匯出 / 刪除紀錄） -->
 <div id="tabPanelDelete" style="display:none;">
   <div style="max-width:980px;margin:0 auto;">
 
@@ -517,6 +518,15 @@
       🗂 知識卡管理
       <span style="font-size:11px;font-weight:400;color:#94a3b8;">篩選後可以批次刪除或匯出，操作前建議先匯出備份</span>
     </div>
+
+    <!-- 內部子分頁：知識卡列表／刪除紀錄 -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button type="button" id="delInnerTabList" class="top-tab active" onclick="switchDelInnerTab('list')">知識卡列表</button>
+      <button type="button" id="delInnerTabLog" class="top-tab" onclick="switchDelInnerTab('log')">🗑 刪除紀錄</button>
+    </div>
+
+    <!-- 子分頁：知識卡列表 -->
+    <div id="delListPanel">
 
     <!-- 篩選條件 -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;">
@@ -571,9 +581,32 @@
       </table>
     </div>
 
+    </div>
+    <!-- /子分頁：知識卡列表 -->
+
+    <!-- 子分頁：刪除紀錄（原本在 history.html，搬過來跟批次刪除放一起，動線一致） -->
+    <div id="delLogPanel" style="display:none;">
+      <div style="font-size:12px;color:var(--slate);margin-bottom:8px;" id="delLogCount">尚未載入</div>
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr style="background:var(--cream);">
+              <th style="padding:9px 10px;text-align:left;">刪除時間</th>
+              <th style="padding:9px 10px;text-align:left;">刪除者</th>
+              <th style="padding:9px 10px;text-align:left;">標題</th>
+              <th style="padding:9px 10px;text-align:left;">分類</th>
+            </tr>
+          </thead>
+          <tbody id="delLogBody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:8px;">只留痕，無法用來復原資料</div>
+    </div>
+    <!-- /子分頁：刪除紀錄 -->
+
   </div>
 
-  <!-- 批次操作列 -->
+  <!-- 批次操作列（只在「知識卡列表」子分頁使用） -->
   <div id="delBatchBar" style="display:none;position:sticky;bottom:0;background:var(--navy);color:#fff;padding:10px 20px;border-radius:10px;align-items:center;gap:14px;margin:14px auto 0;max-width:980px;box-shadow:0 -4px 16px rgba(0,0,0,.15);">
     <span style="font-size:13px;font-weight:600;">已選取 <strong id="delBatchCount">0</strong> 張知識卡</span>
     <div style="flex:1"></div>
@@ -1326,9 +1359,8 @@ function renderItems() {
           <textarea rows="3" placeholder="詳細說明..." oninput="items[${i}].content=this.value">${esc(item.content)}</textarea>
         </div>
         <div class="fg" style="margin:0">
-          <label style="display:flex;justify-content:space-between;align-items:center">
+          <label>
             <span>類別（可複選）*</span>
-            <button type="button" class="btn-inline-add-cat" onclick="switchTab('cat')" style="background:none;border:none;color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;padding:0">+ 新增類別</button>
           </label>
           <div class="cat-grid" data-item-idx="${i}" style="padding:4px 0"></div>
         </div>
@@ -1892,6 +1924,52 @@ function initDeleteTab() {
   if (delTabLoaded) return; // 只在第一次切進來時打後端，之後靠「查詢」按鈕手動刷新
   delTabLoaded = true;
   loadDeleteTabData();
+}
+
+// 知識卡管理內部子分頁：知識卡列表／刪除紀錄
+let delLogData = null; // lazy load，只有真的點進「刪除紀錄」才打後端
+function switchDelInnerTab(mode) {
+  const isList = mode === 'list';
+  document.getElementById('delListPanel').style.display = isList ? 'block' : 'none';
+  document.getElementById('delLogPanel').style.display = isList ? 'none' : 'block';
+  document.getElementById('delInnerTabList').classList.toggle('active', isList);
+  document.getElementById('delInnerTabLog').classList.toggle('active', !isList);
+  // 批次操作列只在「知識卡列表」子分頁有意義，切到刪除紀錄就先藏起來
+  if (!isList) {
+    document.getElementById('delBatchBar').style.display = 'none';
+    if (delLogData === null) loadDeleteLog(); else renderDeleteLogAdmin();
+  } else {
+    updateDeleteBatchBar();
+  }
+}
+
+function loadDeleteLog() {
+  document.getElementById('delLogCount').textContent = '載入中...';
+  gasCall('getDeleteLog').then(res => {
+    delLogData = (res && Array.isArray(res.data)) ? res.data : [];
+    renderDeleteLogAdmin();
+  }).catch(err => {
+    document.getElementById('delLogCount').textContent = '讀取失敗：' + err.message;
+  });
+}
+
+function renderDeleteLogAdmin() {
+  const list = delLogData || [];
+  document.getElementById('delLogCount').innerHTML = '共 <strong>' + list.length + '</strong> 筆刪除紀錄（只留痕，無法用來復原資料）';
+  const body = document.getElementById('delLogBody');
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;font-size:12px;">目前沒有刪除紀錄</td></tr>';
+    return;
+  }
+  body.innerHTML = list.map(d => {
+    const t = d.deletedAt ? new Date(d.deletedAt).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    return '<tr style="border-top:1px solid var(--border);">' +
+      '<td style="padding:8px 10px;">' + esc(t) + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(d.deletedBy || '—') + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(d.title) + '</td>' +
+      '<td style="padding:8px 10px;">' + esc(d.category) + '</td>' +
+    '</tr>';
+  }).join('');
 }
 
 function loadDeleteTabData() {
