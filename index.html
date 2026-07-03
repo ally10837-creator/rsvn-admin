@@ -8,6 +8,8 @@
   <!-- mammoth.js：在瀏覽器端把 .docx 轉成純文字，避免把整份檔案以 base64 送給 Gemini
        （Gemini 免費層對「多模態/檔案輸入」的配額常是 0，純文字輸入才有免費額度） -->
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <!-- SheetJS：在瀏覽器端把 Excel（.xlsx/.xls）轉成文字表格，處理方式跟 .docx 一致 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- flatpickr removed - unreliable in GAS iframe sandbox, using native date inputs instead -->
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
@@ -153,7 +155,12 @@
     .upload-zone:hover,.upload-zone.over{border-color:var(--gold);background:rgba(201,169,110,.05);}
     .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;}
     .upload-title{font-size:13px;font-weight:600;color:var(--navy);margin:7px 0 2px;}
+    .item-img-zone{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1.5px dashed var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;font-size:11.5px;color:var(--slate);transition:all .15s;background:var(--cream);}
     .upload-sub{font-size:11px;color:var(--slate);}
+    .item-img-zone:hover{border-color:var(--gold);color:var(--navy);}
+    .item-img-preview{position:relative;display:inline-block;}
+    .item-img-preview img{max-height:84px;max-width:180px;border-radius:8px;border:1px solid var(--border);display:block;object-fit:cover;}
+    .item-img-remove{position:absolute;top:-7px;right:-7px;background:var(--red);color:#fff;border:2px solid #fff;border-radius:50%;width:19px;height:19px;font-size:11px;line-height:15px;text-align:center;cursor:pointer;padding:0;}
 
     /* FILE LIST */
     .file-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
@@ -396,10 +403,10 @@
       <label>上傳 Memo 檔案（可多選）</label>
       <div style="display:flex;gap:10px;align-items:stretch;">
         <div class="upload-zone" id="uploadZone" style="flex:1;">
-          <input type="file" id="fileInput" accept=".pdf,.docx,.doc,image/*" multiple />
+          <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.xlsx,.xls,image/*" multiple />
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <div class="upload-title">拖曳或點擊上傳</div>
-          <div class="upload-sub">PDF、Word (.docx)、JPG、PNG（單檔最大 20MB）</div>
+          <div class="upload-sub">PDF、Word (.docx)、Excel (.xlsx)、JPG、PNG（單檔最大 20MB）</div>
         </div>
         <button class="btn btn-navy" id="btnAnalyze" onclick="analyze()" style="flex:0 0 116px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;white-space:normal;text-align:center;font-size:11.5px;line-height:1.35;padding:10px 8px;">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -1487,7 +1494,7 @@ function addItem() {
   items.push({
     title: '', content: '',
     categories: cats.length ? [...cats] : [],
-    keywords: '', imageFile: null, imageUrl: '', expiry: '',
+    keywords: '', imageFile: null, imageUrl: '', imageBase64: null, imageMediaType: '', imagePreviewUrl: '', expiry: '',
     date: (memoDateEl && memoDateEl.value) || todayStr
   });
   renderItems();
@@ -1500,6 +1507,47 @@ function addItem() {
 function removeItem(i) {
   items.splice(i, 1);
   renderItems();
+}
+
+// 單張知識卡的參考照片上傳/預覽/移除，只重繪這個小區塊，
+// 不整個 renderItems()（不然會弄丟其他卡片的類別選單展開狀態）
+function renderItemImage(i) {
+  const container = document.querySelector('.item-img-upload[data-item-idx="' + i + '"]');
+  if (!container) return;
+  const item = items[i];
+
+  if (item.imagePreviewUrl) {
+    container.innerHTML = `<div class="item-img-preview">
+      <img src="${item.imagePreviewUrl}" />
+      <button type="button" class="item-img-remove" data-remove-item-img="${i}">✕</button>
+    </div>`;
+    container.querySelector('[data-remove-item-img]').addEventListener('click', () => {
+      items[i].imageFile = null;
+      items[i].imageBase64 = null;
+      items[i].imageMediaType = '';
+      items[i].imagePreviewUrl = '';
+      renderItemImage(i);
+    });
+  } else {
+    container.innerHTML = `<label class="item-img-zone">
+      <input type="file" accept="image/*" style="display:none" data-item-img-input="${i}" />
+      📷 上傳照片
+    </label>`;
+    container.querySelector('[data-item-img-input]').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      items[i].imageFile = file;
+      items[i].imagePreviewUrl = URL.createObjectURL(file);
+      items[i].imageBase64 = null; // 讀取中，送出前會檢查這個欄位確保已經讀完
+      const r = new FileReader();
+      r.onload = ev => {
+        items[i].imageBase64 = ev.target.result.split(',')[1];
+        items[i].imageMediaType = file.type || 'image/jpeg';
+      };
+      r.readAsDataURL(file);
+      renderItemImage(i);
+    });
+  }
 }
 
 function renderChipGroupChecked(cats, chipClass, checkedList) {
@@ -1551,6 +1599,10 @@ function renderItems() {
           </label>
           <div class="cat-grid" data-item-idx="${i}" style="padding:4px 0"></div>
         </div>
+        <div class="fg" style="margin:0">
+          <label>參考照片（選填）</label>
+          <div class="item-img-upload" data-item-idx="${i}"></div>
+        </div>
         <div class="k-row">
           <div class="fg" style="margin:0">
             <label>搜尋關鍵字</label>
@@ -1598,6 +1650,8 @@ function renderItems() {
       }
     });
 
+    renderItemImage(i);
+
     // bind per-item start date field (發布日期)
     setupDateCombo('itemDate_' + i);
     const dateEl = document.getElementById('itemDate_' + i);
@@ -1636,11 +1690,12 @@ function addFiles(files) {
   files.forEach(file => {
     if (file.size > 20 * 1024 * 1024) { alert(file.name + ' 超過 20MB 限制'); return; }
     const ext = file.name.split('.').pop().toLowerCase();
-    const allowed = ['pdf','docx','doc','jpg','jpeg','png','gif','webp'];
+    const allowed = ['pdf','docx','doc','xlsx','xls','jpg','jpeg','png','gif','webp'];
     if (!allowed.includes(ext)) { alert('不支援 .' + ext + ' 格式'); return; }
 
     const isDocx = (ext === 'docx');
-    const entry = { file, name:file.name, size:file.size, base64:null, mediaType:getMediaType(file), status:'ready', isDocx, extractedText:null };
+    const isXlsx = (ext === 'xlsx' || ext === 'xls');
+    const entry = { file, name:file.name, size:file.size, base64:null, mediaType:getMediaType(file), status:'ready', isDocx, isXlsx, extractedText:null };
     uploadedFiles.push(entry);
     renderFileList();
 
@@ -1659,14 +1714,49 @@ function addFiles(files) {
     r.onload = ev => { entry.base64 = ev.target.result.split(',')[1]; };
     r.readAsDataURL(file);
 
-    // .docx 額外用 mammoth 在瀏覽器端抽出純文字，讓 AI 分析改吃文字、不吃檔案
+    // .docx 額外用 mammoth 在瀏覽器端抽出純文字，讓 AI 分析改吃文字、不吃檔案；
+    // 同時額外抽出內嵌圖片（extractRawText 本身不處理圖片，會整個忽略掉，
+    // 如果 memo 裡有房價表截圖、平面圖這類內嵌圖片，不額外處理的話 AI 根本看不到）
     if (isDocx && window.mammoth) {
+      entry.embeddedImages = [];
+      file.arrayBuffer().then(buf => {
+        const textPromise = window.mammoth.extractRawText({ arrayBuffer: buf })
+          .then(result => { entry.extractedText = (result.value || '').trim(); })
+          .catch(err => {
+            console.error('docx 文字抽取失敗：', err);
+            entry.extractedText = ''; // 抽取失敗就當作沒有文字，分析時會退回原本的檔案上傳方式
+          });
+
+        const imagePromise = window.mammoth.convertToHtml(
+          { arrayBuffer: buf },
+          { convertImage: window.mammoth.images.imgElement(image =>
+              image.read('base64').then(base64 => {
+                entry.embeddedImages.push({ base64, contentType: image.contentType });
+                return {}; // 只是借用這個 callback 側面收集圖片，不需要真的產生 <img> 標籤
+              })
+            )
+          }
+        ).catch(err => { console.error('docx 內嵌圖片抽取失敗：', err); });
+
+        return Promise.all([textPromise, imagePromise]);
+      });
+    }
+
+    // .xlsx/.xls 用 SheetJS 抽出每個工作表，轉成文字表格（逗號分隔），道理跟 .docx 一樣：
+    // 讓 AI 吃文字而不是吃整份檔案，避免 Gemini 免費層對檔案輸入的配額限制
+    if (isXlsx && window.XLSX) {
       file.arrayBuffer()
-        .then(buf => window.mammoth.extractRawText({ arrayBuffer: buf }))
-        .then(result => { entry.extractedText = (result.value || '').trim(); })
+        .then(buf => {
+          const wb = window.XLSX.read(buf, { type: 'array' });
+          const sheetTexts = wb.SheetNames.map(name => {
+            const csv = window.XLSX.utils.sheet_to_csv(wb.Sheets[name]);
+            return '（工作表：' + name + '）\n' + csv.trim();
+          });
+          entry.extractedText = sheetTexts.join('\n\n').trim();
+        })
         .catch(err => {
-          console.error('docx 文字抽取失敗：', err);
-          entry.extractedText = ''; // 抽取失敗就當作沒有文字，分析時會退回原本的檔案上傳方式
+          console.error('xlsx 文字抽取失敗：', err);
+          entry.extractedText = '';
         });
     }
   });
@@ -1677,6 +1767,8 @@ function getMediaType(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'pdf') return 'application/pdf';
   if (ext === 'docx' || ext === 'doc') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (ext === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (ext === 'xls') return 'application/vnd.ms-excel';
   if (['jpg','jpeg'].includes(ext)) return 'image/jpeg';
   if (ext === 'png') return 'image/png';
   if (ext === 'gif') return 'image/gif';
@@ -1727,7 +1819,7 @@ function analyze() {
   if (!cats.length) { alert('\u8acb\u9078\u64c7\u81f3\u5c11\u4e00\u500b\u985e\u5225'); return; }
   if (!text && uploadedFiles.every(f => !f.base64)) { alert('\u8acb\u4e0a\u50b3\u6a94\u6848\u6216\u8cbc\u4e0a\u6587\u5b57'); return; }
 
-  const pending = uploadedFiles.filter(f => (!f.base64 && f.file) || (f.isDocx && f.extractedText === null));
+  const pending = uploadedFiles.filter(f => (!f.base64 && f.file) || ((f.isDocx || f.isXlsx) && f.extractedText === null));
   if (pending.length) { alert('\u6a94\u6848\u8b80\u53d6\u4e2d\uff0c\u8acb\u7a0d\u5019\u518d\u8a66'); return; }
 
   const btn = document.getElementById('btnAnalyze');
@@ -1739,7 +1831,7 @@ function analyze() {
 
   const filesPayload = uploadedFiles
     .filter(f => f.base64)
-    .map(f => ({ name: f.name, base64: f.base64, mediaType: f.mediaType, isDocx: f.isDocx, extractedText: f.extractedText }));
+    .map(f => ({ name: f.name, base64: f.base64, mediaType: f.mediaType, isDocx: f.isDocx, isXlsx: f.isXlsx, extractedText: f.extractedText, embeddedImages: f.embeddedImages }));
 
   // \u6539\u7528 google.script.run \u8b93\u5f8c\u7aef\u4ee3\u70ba\u547c\u53eb Gemini API
   // (\u524d\u7aef fetch() \u5728 GAS iframe \u6c99\u7bb1\u4e2d\u6703\u88ab\u5c01\u9396)
@@ -1767,10 +1859,17 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
   const parts = [];
   const docxTexts = [];
   filesPayload.forEach(f => {
-    if (f.isDocx) {
-      // .docx 已在瀏覽器端用 mammoth 抽成純文字，直接併入 prompt，
+    if (f.isDocx || f.isXlsx) {
+      // .docx / .xlsx 已在瀏覽器端抽成純文字，直接併入 prompt，
       // 不走 inline_data —— 避開 Gemini 免費層對「檔案輸入」配額可能是 0 的問題
       if (f.extractedText) docxTexts.push('【檔案：' + f.name + '】\n' + f.extractedText);
+      // docx 內嵌的圖片（例如房價表截圖、平面圖）額外送進去，不能只靠文字，
+      // 這些圖片不算「檔案輸入」，是嵌在文字裡的圖，用量通常不大，直接送
+      if (f.embeddedImages && f.embeddedImages.length) {
+        f.embeddedImages.forEach(img => {
+          parts.push({ inline_data: { mime_type: img.contentType || 'image/png', data: img.base64 } });
+        });
+      }
       return;
     }
     if (!f.base64) return;
@@ -1818,7 +1917,7 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     const newItems = (parsed.items || []).map(it => ({
       title: it.title||'', content: it.content||'',
       categories: [...cats], keywords: it.keywords||'',
-      imageFile: null, imageUrl: '',
+      imageFile: null, imageUrl: '', imageBase64: null, imageMediaType: '', imagePreviewUrl: '',
       date: it.date || defaultDate,     // AI 判斷的起始日，判斷不出來就用 Memo 的起始日
       expiry: it.expiry || ''           // AI 判斷的截止日，判斷不出來就留空＝沒有期限，不硬猜
     }));
@@ -1864,6 +1963,10 @@ function submitAll() {
   // 這裡純粹是最後防呆：如果使用者完全沒用 AI、也沒手動填，給一個日期命名的預設值
   const title = titleInput || ('知識新增_' + date);
 
+  // 每張卡片的參考照片是各自非同步讀取 base64，送出前先確認都讀完了，不然照片會漏傳
+  const imgPending = items.some(k => k.imageFile && !k.imageBase64);
+  if (imgPending) { alert('照片讀取中，請稍候再送出'); return; }
+
   const btn = document.getElementById('btnSubmit');
   if (btn) btn.disabled = true;
   const spin = document.getElementById('submitSpin');
@@ -1871,15 +1974,27 @@ function submitAll() {
 
   const filesPayload = uploadedFiles
     .filter(f => f.base64)
-    .map(f => ({ name: f.name, base64: f.base64, mediaType: f.mediaType, isDocx: f.isDocx, extractedText: f.extractedText }));
+    .map(f => ({ name: f.name, base64: f.base64, mediaType: f.mediaType, isDocx: f.isDocx, isXlsx: f.isXlsx, extractedText: f.extractedText, embeddedImages: f.embeddedImages }));
 
-  const rows = items.map(k => ({
+  // 每張知識卡各自的參考照片，用「item{編號}_原始檔名」當檔名，
+  // 避免跟 memo 層級上傳的檔案、或別張卡的照片撞名，後端是用檔名比對回填 image 欄位
+  const itemImageNames = items.map((k, i) => k.imageFile ? `item${i}_${k.imageFile.name}` : '');
+  items.forEach((k, i) => {
+    if (k.imageFile && k.imageBase64) {
+      filesPayload.push({
+        name: itemImageNames[i], base64: k.imageBase64, mediaType: k.imageMediaType || k.imageFile.type || 'image/jpeg',
+        isDocx: false, isXlsx: false, extractedText: null, embeddedImages: null
+      });
+    }
+  });
+
+  const rows = items.map((k, i) => ({
     date: k.date || date,
     category: k.categories.join(','),
     title: k.title,
     content: k.content,
     image: k.imageUrl || '',
-    imageName: k.imageFile ? k.imageFile.name : '',
+    imageName: itemImageNames[i],
     link: '',
     keywords: k.keywords,
     memo: title,
