@@ -59,7 +59,7 @@
     /* 類別管理：比照新增知識卡頁的滿版兩欄排版，不再是彈窗殘留的窄卡片置中樣式 */
     #tabPanelCat{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
     #tabPanelCat .cat-top-bar{padding:14px 24px 0;flex-shrink:0;}
-    #tabPanelCat .cat-cols{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0;}
+    #tabPanelCat .cat-cols{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr;flex:1;overflow:hidden;min-height:0;}
     #tabPanelCat .cat-col{overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px;min-height:0;}
     #tabPanelCat .cat-col-left{background:#fff;border-right:1px solid var(--border);}
     #tabPanelCat .cat-col-right{background:var(--cream);}
@@ -2122,7 +2122,7 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
   try {
     const res = await fetchWithTimeout(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts }] }) },
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.15 } }) },
       150000
     );
     const data = await res.json();
@@ -2400,7 +2400,7 @@ async function checkSemanticConflicts(rows) {
 
   const res = await fetchWithTimeout(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) },
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.15 } }) },
     90000
   );
   const data = await res.json();
