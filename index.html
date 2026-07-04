@@ -59,8 +59,8 @@
     /* 類別管理：比照新增知識卡頁的滿版兩欄排版，不再是彈窗殘留的窄卡片置中樣式 */
     #tabPanelCat{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
     #tabPanelCat .cat-top-bar{padding:14px 24px 0;flex-shrink:0;}
-    #tabPanelCat .cat-cols{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;}
-    #tabPanelCat .cat-col{overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px;}
+    #tabPanelCat .cat-cols{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0;}
+    #tabPanelCat .cat-col{overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px;min-height:0;}
     #tabPanelCat .cat-col-left{background:#fff;border-right:1px solid var(--border);}
     #tabPanelCat .cat-col-right{background:var(--cream);}
 
@@ -480,7 +480,7 @@
   <div id="catAddPane" class="cat-cols">
     <div class="cat-col cat-col-left">
       <label style="font-size:11px;color:var(--slate);font-weight:600;">選擇大類</label>
-      <div id="catAddParentTree" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:#fff;"></div>
+      <div id="catAddParentTree" style="flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:#fff;"></div>
     </div>
     <div class="cat-col cat-col-right">
       <div id="catAddNewParentArea" style="display:none;">
@@ -507,7 +507,7 @@
   <div id="catRenamePane" class="cat-cols" style="display:none;">
     <div class="cat-col cat-col-left">
       <label style="font-size:11px;color:var(--slate);font-weight:600;" id="catRenameOldLabel">選擇要改的分類</label>
-      <div id="catRenameOldTree" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:#fff;"></div>
+      <div id="catRenameOldTree" style="flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:#fff;"></div>
       <div id="catDeleteArea" style="display:none;flex-direction:column;gap:6px;">
         <div style="display:flex;align-items:center;gap:6px;">
           <button type="button" id="catMoveUpBtn" title="往上移" style="background:#fff;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↑</button>
@@ -2102,7 +2102,7 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     '特別注意：即使幾個規則主題相關（例如都跟「積分」有關），只要它們是「不同維度」的規則（例如：住宿積分 vs 餐飲積分、舊制 vs 新制、不同會員等級的同一項權益），也要拆成不同條目，不要因為主題相近就合併。判斷標準很簡單：如果同仁會分開問「住宿怎麼算點數」跟「餐飲怎麼算點數」這兩個不同問題，這就該是兩張知識卡，不是一張卡硬塞兩件事。',
     '每條需包含 title（10字內）、content（80-200字）、keywords（5-8個逗號分隔關鍵字）。',
     '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
-    '如果拆到最細之後，這一條裡面還是天生包含多個並列的子項（例如同一條規則本身就是「舊制 vs 新制」的對照、或同一個項目在不同條件下的數字列表），content 請用條列格式呈現，每個子項獨立一行、開頭直接是關鍵數字或差異點，不要寫成一整段夾雜逗號的長句；如果這條知識本來就只講一件事，維持簡短口語化的一兩句話就好，不要為了格式統一硬拆成條列。',
+    '如果拆到最細之後，這一條裡面還是天生包含多個並列的子項，才用條列格式呈現 content（每個子項獨立一行、開頭直接是關鍵數字或差異點，不要寫成一整段夾雜逗號的長句）——但「拆到最細」是硬性前提，判斷標準是「這個子項離開這條知識、單獨拿出來問，還有沒有意義」：像是同一個利率/點數對照表裡的其中一格數字、或同一份規則的免責但書附註，離開脈絡就沒有獨立查詢的價值，這種才適合留在同一條、用條列呈現差異。「不同會員等級」「不同消費類型（住宿/餐飲）」「舊制/新制」這種每個子項都能單獨成立一個問題的內容，不算這裡說的「天生並列」，必須依照上一條規則拆成不同條目，不能因為都跟同一個主題（例如都跟「積分」有關）有關就合併塞進一條、用條列包裝當作已經拆過了。條列格式是「同一件事內部的呈現方式」，不是「用來合併不同件事的手段」。如果一條知識本來就只講一件事，維持簡短口語化的一兩句話就好，不要為了格式統一硬拆成條列。',
     '另外請幫每條知識判斷 date（起始日，這條知識何時開始適用，YYYY-MM-DD 格式；如果內容沒有明確日期，就填今天 ' + todayStr + '）',
     '和 expiry（截止日，這條知識何時失效，YYYY-MM-DD 格式；如果內容是長期適用、沒有明確截止日期，這個欄位請留空字串，不要亂猜一個日期）。',
     '不管這份 Memo 的名稱是你自己建議的、還是使用者已經填的，每一條 items 的 keywords 都要包含這個 Memo 名稱本身（或其核心關鍵字）。標題不用強求跟名稱一樣的字眼，各自用最貼切的說法即可，但關鍵字要能錨定回這個名稱，確保同事不管記得的是哪個說法，都能搜尋到這一整批知識。',
@@ -2736,4 +2736,3 @@ tryRestoreDraft();
 
 </body>
 </html>
-
