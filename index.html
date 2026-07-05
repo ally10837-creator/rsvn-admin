@@ -969,6 +969,7 @@ function renderCatGrid() {
   const grid = document.getElementById('catGrid');
   renderCatPicker(grid, categories, {
     selected: memoCatSelected,
+    parentOnly: true,
     onChange: (cat, checked) => { if (checked) memoCatSelected.add(cat); else memoCatSelected.delete(cat); }
   });
 }
@@ -1009,6 +1010,7 @@ function groupCategories(cats) {
 // ===================================================
 function renderCatPicker(container, cats, opts) {
   const selectedSet = opts.selected || new Set();
+  const parentOnlyMode = !!opts.parentOnly;
   const { groups, groupOrder, standalone } = groupCategories(cats);
   let activeParent = groupOrder[0] || null;
   let searchTerm = '';
@@ -1029,6 +1031,22 @@ function renderCatPicker(container, cats, opts) {
 
   function bodyHtml() {
     const term = searchTerm.trim().toLowerCase();
+
+    // Memo 層級用的簡化模式：只需要選大類本身當一個粗略的類別標籤，
+    // 不需要鑽進子類——用一個單欄的勾選清單就好，不用左右分欄
+    if (parentOnlyMode) {
+      const allTop = [...standalone, ...groupOrder];
+      const filtered = term ? allTop.filter(c => c.toLowerCase().includes(term)) : allTop;
+      if (!filtered.length) return '<div class="cat-picker-empty">沒有符合的類別</div>';
+      return '<div class="cat-picker-children" style="width:100%;">' + filtered.map(c => {
+        const checked = selectedSet.has(c) ? 'checked' : '';
+        return `<label class="cat-picker-flat-row" data-cat="${esc(c)}">
+          <input type="checkbox" ${checked} />
+          <span>${esc(c)}</span>
+        </label>`;
+      }).join('') + '</div>';
+    }
+
     if (term) {
       // 搜尋模式：全部類別攤平比對，跳過「先選大類」
       const matches = cats.filter(c => c.toLowerCase().includes(term));
@@ -1046,6 +1064,8 @@ function renderCatPicker(container, cats, opts) {
       }).join('') + '</div>';
     }
 
+    // 每張知識卡自己的類別一定要精準到子類，大類本身不能直接當作分類用，
+    // 所以這裡大類列只負責「點了展開看子類」，不放勾選框
     const parentsHtml = standalone.map(c => {
       const checked = selectedSet.has(c) ? 'checked' : '';
       return `<label class="cat-picker-parent-row" data-cat="${esc(c)}">
@@ -1056,9 +1076,7 @@ function renderCatPicker(container, cats, opts) {
       const active = parent === activeParent ? 'active' : '';
       const n = countSelected(parent);
       const total = groups[parent].length;
-      const parentChecked = selectedSet.has(parent) ? 'checked' : '';
-      return `<div class="cat-picker-parent-row ${active}" data-parent="${esc(parent)}" data-cat="${esc(parent)}">
-        <input type="checkbox" ${parentChecked} title="勾選＝直接用「${esc(parent)}」這個大類本身" />
+      return `<div class="cat-picker-parent-row ${active}" data-parent="${esc(parent)}">
         <span style="flex:1">${esc(parent)}</span>
         <span class="cat-picker-parent-count">${n > 0 ? n + '/' + total : total}</span>
       </div>`;
@@ -1085,9 +1103,22 @@ function renderCatPicker(container, cats, opts) {
     </div>`;
   }
 
+  // 往上找所有目前正在捲動中的祖先元素（不只是元件自己內部的兩個小面板），
+  // 重繪前後都把它們的捲動位置記住/還原——不管畫面跳動實際上是哪一層造成的，
+  // 這裡都能兜住，比只保護內部面板更徹底
+  function findScrollableAncestors(el) {
+    const list = [];
+    let node = el.parentElement;
+    while (node && node !== document.body) {
+      if (node.scrollHeight > node.clientHeight + 1) list.push(node);
+      node = node.parentElement;
+    }
+    return list;
+  }
+
   function render() {
-    // 每次勾選/切換大類都會重繪整個元件，捲動位置要自己記住再還原，
-    // 不然勾完畫面就跳回最上面，讓人搞不清楚有沒有真的勾到
+    const ancestors = findScrollableAncestors(container);
+    const ancestorTops = ancestors.map(n => n.scrollTop);
     const prevParentsScroll = container.querySelector('.cat-picker-parents');
     const prevChildrenScroll = container.querySelector('.cat-picker-children');
     const savedParentsTop = prevParentsScroll ? prevParentsScroll.scrollTop : 0;
@@ -1099,6 +1130,7 @@ function renderCatPicker(container, cats, opts) {
       ${bodyHtml()}
     </div>`;
 
+    ancestors.forEach((n, i) => { n.scrollTop = ancestorTops[i]; });
     const parentsEl = container.querySelector('.cat-picker-parents');
     const childrenEl = container.querySelector('.cat-picker-children');
     if (parentsEl) parentsEl.scrollTop = savedParentsTop;
@@ -2688,4 +2720,3 @@ tryRestoreDraft();
 
 </body>
 </html>
-
