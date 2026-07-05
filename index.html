@@ -1115,11 +1115,23 @@ function renderCatPicker(container, cats, opts) {
   }
 
   function render() {
+    // 每次勾選/切換大類都會重繪整個元件，捲動位置要自己記住再還原，
+    // 不然勾完畫面就跳回最上面，讓人搞不清楚有沒有真的勾到
+    const prevParentsScroll = container.querySelector('.cat-picker-parents');
+    const prevChildrenScroll = container.querySelector('.cat-picker-children');
+    const savedParentsTop = prevParentsScroll ? prevParentsScroll.scrollTop : 0;
+    const savedChildrenTop = prevChildrenScroll ? prevChildrenScroll.scrollTop : 0;
+
     container.innerHTML = `<div class="cat-picker">
       <input type="text" class="cat-picker-search" placeholder="搜尋類別..." value="${esc(searchTerm)}" />
       ${tagsHtml()}
       ${bodyHtml()}
     </div>`;
+
+    const parentsEl = container.querySelector('.cat-picker-parents');
+    const childrenEl = container.querySelector('.cat-picker-children');
+    if (parentsEl) parentsEl.scrollTop = savedParentsTop;
+    if (childrenEl) childrenEl.scrollTop = savedChildrenTop;
 
     const searchEl = container.querySelector('.cat-picker-search');
     // 打字時每個字都會觸發重繪，這裡把焦點跟游標位置補回去，不然每打一個字焦點就跑掉
