@@ -87,7 +87,7 @@
     .cat-chip{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;color:var(--slate);background:#fff;transition:all .15s;user-select:none;}
 
     /* 分類樹狀元件 */
-    .cat-tree{border:1px solid var(--border);border-radius:8px;max-height:230px;overflow-y:auto;padding:6px;background:#fff;}
+    .cat-tree{border:1px solid var(--border);border-radius:8px;height:100%;overflow-y:auto;padding:6px;background:#fff;}
     .cat-tree-group{margin-bottom:2px;}
     .cat-tree-parent-row{display:flex;align-items:center;gap:4px;padding:5px 6px;border-radius:6px;transition:background .12s;}
     .cat-tree-parent-row:hover{background:var(--cream);}
@@ -2100,6 +2100,7 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     '請把內容拆解成員工可以獨立查詢的知識條目，數量依內容豐富度自行判斷，不要被固定條數限制住：內容單純的 memo 可能 2-3 條就夠，但像對照表、交叉比較表這種資訊密集的來源，拆到 10-20 條以上都合理。',
     '每一條的判斷原則是「能不能被獨立搜尋、獨立查閱」——不同會員等級、不同權益類型、不同規則就該分開成不同條，不要為了湊進少量條目把不相關的規則硬塞在同一條裡，那樣之後搜尋會不準。',
     '特別注意：即使幾個規則主題相關（例如都跟「積分」有關），只要它們是「不同維度」的規則（例如：住宿積分 vs 餐飲積分、舊制 vs 新制、不同會員等級的同一項權益），也要拆成不同條目，不要因為主題相近就合併。判斷標準很簡單：如果同仁會分開問「住宿怎麼算點數」跟「餐飲怎麼算點數」這兩個不同問題，這就該是兩張知識卡，不是一張卡硬塞兩件事。',
+    '但是拆分有一個不能破的底線：拆出來的每一條，自己讀起來都必須是一個完整的答案，不能需要另外找別條配對才看得懂。像是規則本身的「不適用情況」「但書」「例外條件」「適用範圍限制」，這些屬於同一條規則的一部分，不能因為想拆更細就切成獨立的一條，那樣同仁查到規則、卻沒查到但書，等於得到不完整甚至誤導的答案。判斷方式：想像同仁只讀到你要拆出來的這一條、完全沒看到其他條目，他會不會因此誤解或漏掉重要限制——如果會，這些內容就要留在同一條裡，不能拆開。',
     '每條需包含 title（10字內）、content（80-200字）、keywords（5-8個逗號分隔關鍵字）。',
     '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
     '如果拆到最細之後，這一條裡面還是天生包含多個並列的子項，才用條列格式呈現 content（每個子項獨立一行、開頭直接是關鍵數字或差異點，不要寫成一整段夾雜逗號的長句）——但「拆到最細」是硬性前提，判斷標準是「這個子項離開這條知識、單獨拿出來問，還有沒有意義」：像是同一個利率/點數對照表裡的其中一格數字、或同一份規則的免責但書附註，離開脈絡就沒有獨立查詢的價值，這種才適合留在同一條、用條列呈現差異。「不同會員等級」「不同消費類型（住宿/餐飲）」「舊制/新制」這種每個子項都能單獨成立一個問題的內容，不算這裡說的「天生並列」，必須依照上一條規則拆成不同條目，不能因為都跟同一個主題（例如都跟「積分」有關）有關就合併塞進一條、用條列包裝當作已經拆過了。條列格式是「同一件事內部的呈現方式」，不是「用來合併不同件事的手段」。如果一條知識本來就只講一件事，維持簡短口語化的一兩句話就好，不要為了格式統一硬拆成條列。',
@@ -2736,4 +2737,3 @@ tryRestoreDraft();
 
 </body>
 </html>
-
