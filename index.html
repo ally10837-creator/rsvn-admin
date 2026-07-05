@@ -84,7 +84,6 @@
 
     /* CATEGORY CHECKBOXES */
     .cat-grid{padding:8px 0;}
-    .cat-chip{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;color:var(--slate);background:#fff;transition:all .15s;user-select:none;}
 
     /* 分類樹狀元件 */
     .cat-tree{border:1px solid var(--border);border-radius:8px;height:100%;overflow-y:auto;padding:6px;background:#fff;}
@@ -142,20 +141,6 @@
     .cat-picker input[type=checkbox]{accent-color:var(--gold);width:13px;height:13px;cursor:pointer;flex-shrink:0;}
     .cat-picker-empty{padding:16px;text-align:center;font-size:11px;color:#94a3b8;}
     .cat-picker-flat-parent{font-size:10px;color:#94a3b8;margin-left:auto;flex-shrink:0;}
-    .cat-group-label{width:100%;font-size:9.5px;font-weight:700;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;margin:6px 0 -2px;}
-    .cat-group-label:first-child{margin-top:0;}
-    .edit-chip-like{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:11px;color:var(--slate);background:#fff;transition:all .15s;user-select:none;margin:2px;}
-    .edit-chip-like.checked{background:var(--navy);color:#fff;border-color:var(--navy);}
-    .edit-chip-like input{display:none;}
-    .cat-chip input{display:none;}
-    .cat-chip.checked{background:var(--navy);color:#fff;border-color:var(--navy);}
-    .cat-chip.checked .chip-dot{background:var(--gold);}
-    .chip-dot{width:6px;height:6px;border-radius:50%;background:#cbd5e1;flex-shrink:0;}
-
-    /* MODE TABS */
-    .mode-tabs{display:flex;gap:3px;background:var(--cream);padding:3px;border-radius:8px;}
-    .mode-tab{flex:1;padding:6px 8px;font-size:12px;font-family:inherit;border:none;border-radius:6px;cursor:pointer;font-weight:500;color:var(--slate);background:transparent;transition:all .15s;}
-    .mode-tab.active{background:#fff;color:var(--navy);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1);}
 
     /* UPLOAD */
     .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--cream);position:relative;}
@@ -224,20 +209,6 @@
     .k-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
     .k-row input,.k-row select{font-size:12px;}
     .k-hint{font-size:10px;color:#94a3b8;margin-top:-4px;}
-
-    /* IMAGE ATTACH */
-    .img-attach{display:flex;align-items:center;gap:8px;}
-    .img-thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid var(--border);display:none;}
-    .img-thumb.show{display:block;}
-    .img-select{font-size:11px;color:var(--slate);background:var(--cream);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-family:inherit;transition:all .15s;}
-    .img-select:hover{border-color:var(--gold);color:var(--gold);}
-    .img-name{font-size:11px;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-
-    /* EXPIRY */
-    .expiry-row{display:flex;align-items:center;gap:8px;}
-    .expiry-toggle{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--slate);cursor:pointer;white-space:nowrap;}
-    .expiry-toggle input{accent-color:var(--gold);width:13px;height:13px;}
-    .expiry-date{font-size:12px;flex:1;}
 
     /* ADD K BTN */
     .btn-add-k{display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border:2px dashed var(--border);border-radius:11px;color:var(--slate);font-size:12px;font-weight:600;background:none;cursor:pointer;font-family:inherit;transition:all .15s;width:100%;}
@@ -525,8 +496,8 @@
         <label style="font-size:11px;color:var(--slate);font-weight:600;display:block;margin-bottom:4px;">要做什麼</label>
         <select id="catRenameScope" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
           <option value="parent">改大類名字（底下所有相關的一起換）</option>
-          <option value="renameOnly">只改名字，位置不動</option>
-          <option value="move">搬到別的大類底下</option>
+          <option value="renameOnly">改小類名字，位置不動</option>
+          <option value="move">改小類名字和位置</option>
         </select>
         <div id="catRenameScopeHint" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
       </div>
@@ -1248,7 +1219,9 @@ function renderCatTree(container, cats, opts) {
     html += `<div class="cat-tree-new-node" data-new-parent="1">＋ 建立新大類</div>`;
   }
   html += `</div>`;
+  const savedScrollTop = container.scrollTop;
   container.innerHTML = html;
+  container.scrollTop = savedScrollTop;
 
   container.querySelectorAll('[data-toggle]').forEach(t => {
     t.addEventListener('click', e => {
@@ -1290,29 +1263,6 @@ function renderCatTree(container, cats, opts) {
       if (nn) nn.addEventListener('click', e => { e.stopPropagation(); opts.onNewParent(); });
     }
   }
-}
-
-function renderChipGroup(cats, chipClass) {
-  const { groups, groupOrder, standalone } = groupCategories(cats);
-  let html = '';
-  if (standalone.length) {
-    html += standalone.map(c => `
-      <label class="${chipClass}">
-        <input type="checkbox" value="${esc(c)}" />
-        <div class="chip-dot"></div>
-        ${esc(c)}
-      </label>`).join('');
-  }
-  groupOrder.forEach(parent => {
-    html += `<div class="cat-group-label">${esc(parent)}</div>`;
-    html += groups[parent].map(({full, child}) => `
-      <label class="${chipClass}">
-        <input type="checkbox" value="${esc(full)}" />
-        <div class="chip-dot"></div>
-        ${esc(child)}
-      </label>`).join('');
-  });
-  return html;
 }
 
 function getSelectedCats() {
@@ -1492,7 +1442,7 @@ function populateRenameOldSelect() {
     onSelect: cat => {
       catRenameOldValue = cat;
       // 大類跟子類都能點：如果目前是「改大類名字」模式，但點到的其實是子類，
-      // 代表使用者要改的是單一子類，自動切到「只改名字，位置不動」比較合理
+      // 代表使用者要改的是單一子類，自動切到「改小類名字，位置不動」比較合理
       const { groupOrder } = groupCategories(categories);
       if (document.getElementById('catRenameScope').value === 'parent' && !groupOrder.includes(cat)) {
         document.getElementById('catRenameScope').value = 'renameOnly';
@@ -1771,21 +1721,6 @@ function renderItemImage(i) {
       renderItemImage(i);
     });
   }
-}
-
-function renderChipGroupChecked(cats, chipClass, checkedList) {
-  const { groups, groupOrder, standalone } = groupCategories(cats);
-  const chip = c => `
-      <label class="${chipClass}" data-cat="${esc(c)}">
-        <input type="checkbox" ${checkedList.includes(c)?'checked':''} />
-        ${esc(c.includes('/') ? c.slice(c.indexOf('/')+1) : c)}
-      </label>`;
-  let html = standalone.map(chip).join('');
-  groupOrder.forEach(parent => {
-    html += `<div class="cat-group-label">${esc(parent)}</div>`;
-    html += groups[parent].map(({full}) => chip(full)).join('');
-  });
-  return html;
 }
 
 function renderItems() {
