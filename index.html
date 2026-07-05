@@ -1251,9 +1251,14 @@ function renderCatTree(container, cats, opts) {
     html += `<div class="cat-tree-new-node" data-new-parent="1">＋ 建立新大類</div>`;
   }
   html += `</div>`;
-  const savedScrollTop = container.scrollTop;
+  // 真正在捲動的是裡面的 .cat-tree（外層容器 flex:1 撐滿高度、裡面內容剛好 100% 貼齊，
+  // 外層本身不會溢出、不會捲動——會捲動、也會被整個砍掉重建的是內層這個 .cat-tree div，
+  // 之前誤保護了外層容器的捲動位置，那個位置本來就一直是 0，等於沒保護到
+  const existingTree = container.querySelector('.cat-tree');
+  const savedScrollTop = existingTree ? existingTree.scrollTop : 0;
   container.innerHTML = html;
-  container.scrollTop = savedScrollTop;
+  const newTree = container.querySelector('.cat-tree');
+  if (newTree) newTree.scrollTop = savedScrollTop;
 
   container.querySelectorAll('[data-toggle]').forEach(t => {
     t.addEventListener('click', e => {
@@ -2720,4 +2725,3 @@ tryRestoreDraft();
 
 </body>
 </html>
-
