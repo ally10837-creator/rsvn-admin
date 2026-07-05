@@ -479,7 +479,7 @@
     <div class="cat-col cat-col-left">
       <label style="font-size:11px;color:var(--slate);font-weight:600;" id="catRenameOldLabel">選擇要改的分類</label>
       <div id="catRenameOldTree" style="flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:#fff;"></div>
-      <div id="catDeleteArea" style="display:none;flex-direction:column;gap:6px;">
+      <div id="catDeleteArea" style="display:flex;visibility:hidden;flex-direction:column;gap:6px;">
         <div style="display:flex;align-items:center;gap:6px;">
           <button type="button" id="catMoveUpBtn" title="往上移" style="background:#fff;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↑</button>
           <button type="button" id="catMoveDownBtn" title="往下移" style="background:#fff;border:1px solid var(--border);color:var(--slate);font-size:12px;width:26px;height:26px;border-radius:6px;cursor:pointer;">↓</button>
@@ -1409,7 +1409,7 @@ document.getElementById('catAddConfirm').addEventListener('click', () => {
 function populateRenameSelect() {
   catRenameOldValue = '';
   catRenameNewParentValue = '';
-  document.getElementById('catDeleteArea').style.display = 'none';
+  document.getElementById('catDeleteArea').style.visibility = 'hidden';
   populateRenameOldSelect();
   populateRenameNewParentSelect();
   updateScopeHint();
@@ -1450,7 +1450,7 @@ function populateRenameOldSelect() {
       }
       populateRenameOldSelect();
       updateDestinationUI();
-      document.getElementById('catDeleteArea').style.display = cat ? 'flex' : 'none';
+      document.getElementById('catDeleteArea').style.visibility = cat ? 'visible' : 'hidden';
       document.getElementById('catDeleteTarget').textContent = cat;
       document.getElementById('catMoveTarget').textContent = cat;
     }
@@ -1528,7 +1528,7 @@ function updateDestinationUI() {
 document.getElementById('catRenameScope').addEventListener('change', () => {
   catRenameOldValue = '';
   catRenameNewParentValue = '';
-  document.getElementById('catDeleteArea').style.display = 'none';
+  document.getElementById('catDeleteArea').style.visibility = 'hidden';
   populateRenameOldSelect();
   updateScopeHint();
   updateDestinationUI();
@@ -1578,7 +1578,7 @@ function moveCatOrder(direction) {
     renderCatGrid();
     renderItems();
     populateRenameOldSelect();
-    document.getElementById('catDeleteArea').style.display = 'flex';
+    document.getElementById('catDeleteArea').style.visibility = 'visible';
     document.getElementById('catDeleteTarget').textContent = name;
     document.getElementById('catMoveTarget').textContent = name;
   }).catch(e => alert('無法調整：' + e.message));
@@ -1599,7 +1599,7 @@ document.getElementById('catDeleteBtn').addEventListener('click', () => {
     memoCatSelected.delete(name);
     items.forEach(it => { it.categories = it.categories.filter(c => c !== name); });
     catRenameOldValue = '';
-    document.getElementById('catDeleteArea').style.display = 'none';
+    document.getElementById('catDeleteArea').style.visibility = 'hidden';
     renderCatGrid();
     renderItems();
     populateRenameOldSelect();
@@ -1636,7 +1636,7 @@ document.getElementById('catRenameConfirm').addEventListener('click', () => {
     // 停在同一個畫面，方便連續改下一個分類，不用重新打開彈窗
     catRenameOldValue = '';
     catRenameNewParentValue = '';
-    document.getElementById('catDeleteArea').style.display = 'none';
+    document.getElementById('catDeleteArea').style.visibility = 'hidden';
     document.getElementById('catRenameNewChildText').value = '';
     document.getElementById('catRenameNewParentText').value = '';
     populateRenameOldSelect();
