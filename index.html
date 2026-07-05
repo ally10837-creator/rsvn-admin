@@ -1085,7 +1085,9 @@ function renderCatPicker(container, cats, opts) {
       const active = parent === activeParent ? 'active' : '';
       const n = countSelected(parent);
       const total = groups[parent].length;
-      return `<div class="cat-picker-parent-row ${active}" data-parent="${esc(parent)}">
+      const parentChecked = selectedSet.has(parent) ? 'checked' : '';
+      return `<div class="cat-picker-parent-row ${active}" data-parent="${esc(parent)}" data-cat="${esc(parent)}">
+        <input type="checkbox" ${parentChecked} title="勾選＝直接用「${esc(parent)}」這個大類本身" />
         <span style="flex:1">${esc(parent)}</span>
         <span class="cat-picker-parent-count">${n > 0 ? n + '/' + total : total}</span>
       </div>`;
@@ -2099,7 +2101,9 @@ async function analyzeDirectly(apiKey, title, cats, text, filesPayload, btn, spi
     memoContextLine,
     '請把內容拆解成員工可以獨立查詢的知識條目，數量依內容豐富度自行判斷，不要被固定條數限制住：內容單純的 memo 可能 2-3 條就夠，但像對照表、交叉比較表這種資訊密集的來源，拆到 10-20 條以上都合理。',
     '每一條的判斷原則是「能不能被獨立搜尋、獨立查閱」——不同會員等級、不同權益類型、不同規則就該分開成不同條，不要為了湊進少量條目把不相關的規則硬塞在同一條裡，那樣之後搜尋會不準。',
-    '特別注意：即使幾個規則主題相關（例如都跟「積分」有關），只要它們是「不同維度」的規則（例如：住宿積分 vs 餐飲積分、舊制 vs 新制、不同會員等級的同一項權益），也要拆成不同條目，不要因為主題相近就合併。判斷標準很簡單：如果同仁會分開問「住宿怎麼算點數」跟「餐飲怎麼算點數」這兩個不同問題，這就該是兩張知識卡，不是一張卡硬塞兩件事。',
+    '特別注意：即使幾個規則主題相關（例如都跟「積分」有關），只要它們是「不同種類的事」（例如：住宿積分 vs 餐飲積分，這是不同消費類型；或舊制 vs 新制，這是不同時期的規則），也要拆成不同條目，不要因為主題相近就合併。判斷標準很簡單：如果同仁會分開問「住宿怎麼算點數」跟「餐飲怎麼算點數」這兩個不同問題，這就該是兩張知識卡，不是一張卡硬塞兩件事。',
+    '但「同一項權益、不同會員等級的版本」不算上面說的「不同種類的事」，這種是同一件事的對照表（例如 Plus One 福利，STANDARD/LOYAL/EXCLUSIVE/EXCLUSIVE+ 各等級各自的內容），應該合併成一張卡、用條列列出各等級的差異，不要拆成一個等級一張卡。判斷依據：同仁通常是先想到「這個福利」、再帶入等級去查（「LOYAL 的 Plus One 是什麼」其實是查同一件事的不同版本），不是把它當成四個獨立的問題。拆成一個等級一張卡，同仁搜尋這個福利時會一次跳出好幾張長得幾乎一樣的卡片，反而更難比較。',
+    '這種「跨等級/跨維度對照」的卡片，keywords 務必把矩陣的所有維度都標進去（例如上述 Plus One 卡片，keywords 要同時包含「STANDARD、LOYAL、EXCLUSIVE、EXCLUSIVE+」這些等級名稱，不能只寫「Plus One」），確保同仁不管是想到「這個福利叫什麼」還是想到「這個等級有什麼」都能搜尋到這張卡，兩個方向都要能命中。',
     '但是拆分有一個不能破的底線：拆出來的每一條，自己讀起來都必須是一個完整的答案，不能需要另外找別條配對才看得懂。像是規則本身的「不適用情況」「但書」「例外條件」「適用範圍限制」，這些屬於同一條規則的一部分，不能因為想拆更細就切成獨立的一條，那樣同仁查到規則、卻沒查到但書，等於得到不完整甚至誤導的答案。判斷方式：想像同仁只讀到你要拆出來的這一條、完全沒看到其他條目，他會不會因此誤解或漏掉重要限制——如果會，這些內容就要留在同一條裡，不能拆開。',
     '每條需包含 title（10字內）、content（80-200字）、keywords（5-8個逗號分隔關鍵字）。',
     '如果這條知識涉及金額、費用、數量等具體數字，content 的第一句話務必先講出這個關鍵數字（例如「加床費用：NT$800/晚。」），不要把數字埋在段落中間，方便同仁一眼掃到重點。',
@@ -2737,4 +2741,3 @@ tryRestoreDraft();
 
 </body>
 </html>
-
