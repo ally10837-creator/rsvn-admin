@@ -13,6 +13,8 @@ entire "codebase" is that one file.
 The UI text, code comments, and domain vocabulary are almost entirely **Traditional
 Chinese (zh-TW)**. Match that when editing user-facing strings or comments.
 
+**與使用者的對話一律用繁體中文回覆**（程式碼、commit message 可維持英文，技術詞彙不用刻意翻譯）。
+
 ## Deployment / workflow
 
 - `.github/workflows/static.yml` deploys the **entire repo root as-is** to GitHub
